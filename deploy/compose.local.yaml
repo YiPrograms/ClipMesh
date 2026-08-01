@@ -7,7 +7,7 @@ services:
     environment:
       CLIPMESH_PUBLIC_URL: http://127.0.0.1:8787
       CLIPMESH_INSTANCE_NAME: Local ClipMesh
-      CLIPMESH_EXTENSION_DOWNLOAD_URL: ${CLIPMESH_EXTENSION_DOWNLOAD_URL:-https://github.com/YiPrograms/ClipMesh/releases/download/v0.3.1/clipmesh-extension-v0.3.1.zip}
+      CLIPMESH_EXTENSION_DOWNLOAD_URL: ${CLIPMESH_EXTENSION_DOWNLOAD_URL:-https://github.com/YiPrograms/ClipMesh/releases/download/v0.3.2/clipmesh-extension-v0.3.2.zip}
       CLIPMESH_MAX_FILE_BYTES: ${CLIPMESH_MAX_FILE_BYTES:-2GiB}
       CLIPMESH_FILE_RETENTION: ${CLIPMESH_FILE_RETENTION:-7d}
       CLIPMESH_FILE_STORAGE_QUOTA: ${CLIPMESH_FILE_STORAGE_QUOTA:-50GiB}

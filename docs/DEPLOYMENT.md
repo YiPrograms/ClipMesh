@@ -86,7 +86,7 @@ Never enable a TLS-certificate bypass. Apply HSTS at the reverse proxy only afte
 Tagged releases publish `clipmesh-extension-vVERSION.zip` together with the native archives and a shared `SHA256SUMS`. To advertise manual installation on the onboarding page:
 
 ```sh
-CLIPMESH_EXTENSION_DOWNLOAD_URL=https://github.com/YiPrograms/ClipMesh/releases/download/v0.3.1/clipmesh-extension-v0.3.1.zip
+CLIPMESH_EXTENSION_DOWNLOAD_URL=https://github.com/YiPrograms/ClipMesh/releases/download/v0.3.2/clipmesh-extension-v0.3.2.zip
 ```
 
 The server derives the adjacent `SHA256SUMS` link from this URL. The onboarding page explains that users must extract the ZIP into a permanent folder, enable Developer mode at `chrome://extensions`, select **Load unpacked**, and update the same folder in place. This distribution path is manual and does not provide Chrome Web Store signing or automatic updates.
@@ -102,14 +102,14 @@ CLIPMESH_CHROME_STORE_URL=https://chromewebstore.google.com/detail/clipmesh/EXTE
 The onboarding page shows Windows, macOS, and Linux cards. To turn those cards into links, set both variables below; omit both to leave native downloads unavailable without affecting existing deployments:
 
 ```sh
-CLIPMESH_CLIENT_RELEASE_BASE_URL=https://github.com/YiPrograms/ClipMesh/releases/download/v0.3.1/
-CLIPMESH_CLIENT_VERSION=0.3.1
+CLIPMESH_CLIENT_RELEASE_BASE_URL=https://github.com/YiPrograms/ClipMesh/releases/download/v0.3.2/
+CLIPMESH_CLIENT_VERSION=0.3.2
 ```
 
 The base URL is the directory containing the three portable archives and `SHA256SUMS`. It must use HTTPS outside loopback development. ClipMesh constructs deterministic asset names:
 
-- `clipmesh-client-v0.3.1-windows-x86_64.zip`
-- `clipmesh-client-v0.3.1-linux-x86_64.tar.gz`
-- `clipmesh-client-v0.3.1-macos-universal.tar.gz`
+- `clipmesh-client-v0.3.2-windows-x86_64.zip`
+- `clipmesh-client-v0.3.2-linux-x86_64.tar.gz`
+- `clipmesh-client-v0.3.2-macos-universal.tar.gz`
 
 The tag-triggered release workflow builds these archives, publishes checksums, and records GitHub artifact attestations. The initial native release is unsigned, so the download page directs users to verify `SHA256SUMS`; production distributors may add platform signing without changing filenames.

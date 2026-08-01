@@ -1,6 +1,6 @@
 use std::{io, time::Duration};
 
-use clipmesh_protocol::{crypto::ClipboardItem, routing};
+use clipmesh_protocol::{crypto::ClipboardItem, routing, wire::ChannelSummary};
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     execute,
@@ -44,6 +44,9 @@ async fn event_loop(
     let tabs = ["Status", "Channels", "Clipboard", "History", "Security"];
     let mut selected = 0usize;
     let mut channel_selected = 0usize;
+    let mut available_channels = Vec::new();
+    let mut channels_loaded = false;
+    let mut channels_error = None;
     let mut history_selected = 0usize;
     loop {
         let snapshot = engine.snapshot.borrow().clone();
@@ -85,13 +88,20 @@ async fn event_loop(
             );
             match selected {
                 0 => status(frame, chunks[1], &snapshot),
-                1 => channels(frame, chunks[1], paths, channel_selected),
+                1 => channels(
+                    frame,
+                    chunks[1],
+                    paths,
+                    &available_channels,
+                    channel_selected,
+                    channels_error.as_deref(),
+                ),
                 2 => clipboard(frame, chunks[1], &snapshot),
                 3 => history_view(frame, chunks[1], paths, history_selected),
                 _ => security(frame, chunks[1], paths),
             }
             let help = match selected {
-                1 => "↑/↓ select  s send  r receive  c create  j join  ←/→ tabs  q quit",
+                1 => "↑/↓ select  j join  s send  r receive  c create  u refresh  ←/→ tabs  q quit",
                 3 => "↑/↓ select  y copy  e resend  d delete  ←/→ tabs  q quit",
                 _ => "←/→ tabs  p pair  t send text  space pause  q quit",
             };
@@ -100,6 +110,19 @@ async fn event_loop(
                 chunks[2],
             );
         })?;
+        if selected == 1 && !channels_loaded {
+            channels_loaded = true;
+            match commands::available_channels(paths).await {
+                Ok(channels) => {
+                    available_channels = channels;
+                    channels_error = None;
+                    let length = channel_entries(paths, &available_channels).len();
+                    channel_selected = channel_selected.min(length.saturating_sub(1));
+                }
+                Err(error) => channels_error = Some(error.to_string()),
+            }
+            continue;
+        }
         if event::poll(Duration::from_millis(150))?
             && let Event::Key(key) = event::read()?
             && key.kind == KeyEventKind::Press
@@ -112,7 +135,7 @@ async fn event_loop(
                     channel_selected = channel_selected.saturating_sub(1);
                 }
                 KeyCode::Down if selected == 1 => {
-                    let length = state::load(paths)?.channels.len();
+                    let length = channel_entries(paths, &available_channels).len();
                     if length > 0 {
                         channel_selected = (channel_selected + 1).min(length - 1);
                     }
@@ -139,6 +162,7 @@ async fn event_loop(
                     resume(terminal)?;
                     result?;
                     let _ = engine.commands.send(EngineCommand::Reload).await;
+                    channels_loaded = false;
                 }
                 KeyCode::Char('t') => {
                     suspend(terminal)?;
@@ -154,10 +178,18 @@ async fn event_loop(
                     }
                 }
                 KeyCode::Char('s') if selected == 1 => {
-                    toggle_selected_route(paths, channel_selected, true)?;
+                    if let Some(channel_id) =
+                        selected_channel(paths, &available_channels, channel_selected)
+                    {
+                        toggle_route(paths, channel_id, true)?;
+                    }
                 }
                 KeyCode::Char('r') if selected == 1 => {
-                    toggle_selected_route(paths, channel_selected, false)?;
+                    if let Some(channel_id) =
+                        selected_channel(paths, &available_channels, channel_selected)
+                    {
+                        toggle_route(paths, channel_id, false)?;
+                    }
                 }
                 KeyCode::Char('c') if selected == 1 => {
                     suspend(terminal)?;
@@ -165,13 +197,28 @@ async fn event_loop(
                     let result = commands::create_channel(paths, &name).await;
                     resume(terminal)?;
                     result?;
+                    channels_loaded = false;
+                    let _ = engine.commands.send(EngineCommand::Reload).await;
                 }
                 KeyCode::Char('j') if selected == 1 => {
-                    suspend(terminal)?;
-                    let id = commands::prompt("Channel ID: ", false)?.parse()?;
-                    let result = commands::join_channel(paths, id).await;
-                    resume(terminal)?;
-                    result?;
+                    if let Some(channel_id) =
+                        selected_channel(paths, &available_channels, channel_selected)
+                        && !state::load(paths)?
+                            .channels
+                            .iter()
+                            .any(|channel| channel.id == channel_id)
+                    {
+                        suspend(terminal)?;
+                        let result = commands::join_channel(paths, channel_id).await;
+                        resume(terminal)?;
+                        result?;
+                        channels_loaded = false;
+                        let _ = engine.commands.send(EngineCommand::Reload).await;
+                    }
+                }
+                KeyCode::Char('u') if selected == 1 => {
+                    channels_loaded = false;
+                    channels_error = None;
                 }
                 KeyCode::Char('y') if selected == 3 => {
                     if let Some(id) = selected_history(paths, history_selected)? {
@@ -198,7 +245,7 @@ async fn event_loop(
                 }
                 KeyCode::Char(' ') => {
                     let value = state::load(paths)?;
-                    commands::set_pause(
+                    commands::update_pause(
                         paths,
                         Some(!value.pause_sending),
                         Some(!value.pause_receiving),
@@ -246,32 +293,51 @@ fn channels(
     frame: &mut ratatui::Frame,
     area: ratatui::layout::Rect,
     paths: &Paths,
+    available: &[ChannelSummary],
     selected: usize,
+    error: Option<&str>,
 ) {
     let value = state::load(paths).unwrap_or_default();
-    let items: Vec<_> = value
-        .channels
+    let entries = channel_entries_from_state(&value, available);
+    let mut items: Vec<_> = entries
         .iter()
         .enumerate()
         .map(|(index, channel)| {
+            let joined = value.channels.iter().any(|joined| joined.id == channel.id);
             let route = value
                 .routes
                 .iter()
                 .find(|route| route.channel_id == channel.id);
+            let members = channel
+                .member_count
+                .map(|count| count.to_string())
+                .unwrap_or_else(|| "—".into());
             ListItem::new(format!(
-                "{} {}  send:{} receive:{}\n    {}",
+                "{} {}  [{}] members:{}  send:{} receive:{}\n    {}",
                 if index == selected { "›" } else { " " },
                 channel.name,
+                if joined { "joined" } else { "available" },
+                members,
                 yn(route.is_some_and(|v| v.send_enabled)),
                 yn(route.is_some_and(|v| v.receive_enabled)),
                 channel.id
             ))
         })
         .collect();
+    if items.is_empty() {
+        items.push(ListItem::new(match error {
+            Some(error) => format!("Could not load server channels: {error}\nPress u to retry."),
+            None => "No channels are available. Press c to create one.".into(),
+        }));
+    } else if let Some(error) = error {
+        items.push(ListItem::new(format!(
+            "\nServer refresh failed: {error}\nShowing locally joined channels. Press u to retry."
+        )));
+    }
     frame.render_widget(
         List::new(items).block(
             Block::default()
-                .title(" Joined channels · manage with clipmesh channel … ")
+                .title(" Server channels · select one and press j to join ")
                 .borders(Borders::ALL),
         ),
         area,
@@ -290,17 +356,7 @@ fn history_view(
     let items = rows
         .iter()
         .enumerate()
-        .map(|(index, row)| {
-            ListItem::new(format!(
-                "{} {} · {} · {} · {}\n    {}",
-                if index == selected { "›" } else { " " },
-                row.direction,
-                row.content_type,
-                row.channel_name,
-                row.delivery_status,
-                row.local_id
-            ))
-        })
+        .map(|(index, row)| ListItem::new(format_history_row(index == selected, row)))
         .collect::<Vec<_>>();
     frame.render_widget(
         List::new(items).block(
@@ -330,11 +386,62 @@ fn yn(value: bool) -> &'static str {
     if value { "on" } else { "off" }
 }
 
-fn toggle_selected_route(paths: &Paths, selected: usize, send: bool) -> anyhow::Result<()> {
+#[derive(Clone, Debug)]
+struct ChannelEntry {
+    id: uuid::Uuid,
+    name: String,
+    member_count: Option<u32>,
+}
+
+fn channel_entries(paths: &Paths, available: &[ChannelSummary]) -> Vec<ChannelEntry> {
+    channel_entries_from_state(&state::load(paths).unwrap_or_default(), available)
+}
+
+fn channel_entries_from_state(
+    value: &state::StateFile,
+    available: &[ChannelSummary],
+) -> Vec<ChannelEntry> {
+    let mut entries = available
+        .iter()
+        .map(|channel| ChannelEntry {
+            id: channel.id,
+            name: channel.name.clone(),
+            member_count: Some(channel.member_count),
+        })
+        .collect::<Vec<_>>();
+    entries.extend(
+        value
+            .channels
+            .iter()
+            .filter(|channel| !available.iter().any(|remote| remote.id == channel.id))
+            .map(|channel| ChannelEntry {
+                id: channel.id,
+                name: channel.name.clone(),
+                member_count: None,
+            }),
+    );
+    entries
+}
+
+fn selected_channel(
+    paths: &Paths,
+    available: &[ChannelSummary],
+    selected: usize,
+) -> Option<uuid::Uuid> {
+    channel_entries(paths, available)
+        .get(selected)
+        .map(|channel| channel.id)
+}
+
+fn toggle_route(paths: &Paths, channel_id: uuid::Uuid, send: bool) -> anyhow::Result<()> {
     let mut value = state::load(paths)?;
-    let Some(channel_id) = value.channels.get(selected).map(|channel| channel.id) else {
+    if !value
+        .channels
+        .iter()
+        .any(|channel| channel.id == channel_id)
+    {
         return Ok(());
-    };
+    }
     let enabled = value
         .routes
         .iter()
@@ -356,8 +463,45 @@ fn toggle_selected_route(paths: &Paths, selected: usize, send: bool) -> anyhow::
     state::save(paths, &value)
 }
 
+fn format_history_row(selected: bool, row: &history::HistoryRow) -> String {
+    format!(
+        "{} {} · {} · {} · {}\n    from {} · {}",
+        if selected { "›" } else { " " },
+        row.direction,
+        row.content_type,
+        row.channel_name,
+        row.delivery_status,
+        row.origin_device_name,
+        row.local_id
+    )
+}
+
 fn selected_history(paths: &Paths, selected: usize) -> anyhow::Result<Option<uuid::Uuid>> {
     Ok(history::recent(&paths.history_db, 100)?
         .get(selected)
         .map(|row| row.local_id))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn history_row_identifies_the_origin_device() {
+        let row = history::HistoryRow {
+            local_id: uuid::Uuid::nil(),
+            item_id: uuid::Uuid::nil(),
+            channel_id: uuid::Uuid::nil(),
+            channel_name: "Shared".into(),
+            origin_device_name: "Living-room PC".into(),
+            direction: "received".into(),
+            content_type: "text/plain".into(),
+            stored_at: 0,
+            delivery_status: "received".into(),
+        };
+
+        let rendered = format_history_row(true, &row);
+
+        assert!(rendered.contains("from Living-room PC"));
+    }
 }

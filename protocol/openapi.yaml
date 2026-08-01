@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ClipMesh API
-  version: 0.3.1
+  version: 0.3.2
   description: Password-opaque routing API for encrypted clipboard envelopes and retained file objects. There is intentionally no history endpoint.
 servers:
   - url: /api/v1

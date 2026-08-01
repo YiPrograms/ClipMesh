@@ -143,8 +143,8 @@ pub async fn send_file(
 }
 
 pub async fn list_channels(paths: &Paths) -> anyhow::Result<()> {
-    let (state_file, api) = authenticated(paths)?;
-    let channels = api.channels().await?;
+    let state_file = state::load(paths)?;
+    let channels = available_channels(paths).await?;
     println!(
         "{:<38} {:<26} {:<7} {:<7} MEMBERS",
         "ID", "NAME", "SEND", "RECV"
@@ -164,6 +164,11 @@ pub async fn list_channels(paths: &Paths) -> anyhow::Result<()> {
         );
     }
     Ok(())
+}
+
+pub async fn available_channels(paths: &Paths) -> anyhow::Result<Vec<ChannelSummary>> {
+    let (_, api) = authenticated(paths)?;
+    api.channels().await
 }
 
 pub async fn create_channel(paths: &Paths, name: &str) -> anyhow::Result<()> {
@@ -282,14 +287,7 @@ pub fn set_pause(
     sending: Option<bool>,
     receiving: Option<bool>,
 ) -> anyhow::Result<()> {
-    let mut value = state::load(paths)?;
-    if let Some(flag) = sending {
-        value.pause_sending = flag;
-    }
-    if let Some(flag) = receiving {
-        value.pause_receiving = flag;
-    }
-    state::save(paths, &value)?;
+    let value = update_pause(paths, sending, receiving)?;
     println!(
         "Sending: {} · receiving: {}",
         if value.pause_sending {
@@ -304,6 +302,22 @@ pub fn set_pause(
         }
     );
     Ok(())
+}
+
+pub(crate) fn update_pause(
+    paths: &Paths,
+    sending: Option<bool>,
+    receiving: Option<bool>,
+) -> anyhow::Result<state::StateFile> {
+    let mut value = state::load(paths)?;
+    if let Some(flag) = sending {
+        value.pause_sending = flag;
+    }
+    if let Some(flag) = receiving {
+        value.pause_receiving = flag;
+    }
+    state::save(paths, &value)?;
+    Ok(value)
 }
 
 pub fn list_history(paths: &Paths) -> anyhow::Result<()> {

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "ClipMesh",
   "description": "End-to-end encrypted clipboard sync through your own server.",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "homepage_url": "https://github.com/YiPrograms/ClipMesh",
   "minimum_chrome_version": "116",
   "permissions": ["activeTab", "alarms", "clipboardRead", "clipboardWrite", "offscreen", "storage"],
