@@ -4,7 +4,7 @@ ClipMesh must be exposed over HTTPS/WSS except during loopback development. The 
 
 ## Container deployment
 
-ClipMesh publishes a public multi-platform server image for Linux x86-64 and ARM64 at `ghcr.io/yiprograms/clipmesh`. No registry login is required. `latest` follows the latest successful build from `main`; release deployments should pin a version tag such as `0.3.0`.
+ClipMesh publishes a public multi-platform server image for Linux x86-64 and ARM64 at `ghcr.io/yiprograms/clipmesh`. No registry login is required. `latest` follows the latest successful build from `main`. Every build also publishes an immutable `sha-SHORT_COMMIT` tag, and tag-triggered builds publish semantic version tags.
 
 For a local loopback-only evaluation without cloning the repository, download the minimal server Compose example:
 
@@ -40,7 +40,7 @@ curl --fail https://clipmesh.example.com/api/v1/health
 docker compose --env-file .env -f compose.yaml down
 ```
 
-Set `CLIPMESH_IMAGE=ghcr.io/yiprograms/clipmesh:VERSION` in `.env` to pin a release. Upgrades then require only a backup followed by `docker compose pull` and `docker compose up -d`. To build the current checkout instead, combine either base file with the source-build override:
+Set `CLIPMESH_IMAGE=ghcr.io/yiprograms/clipmesh:sha-07d4883` in `.env` to pin the currently published image; use a semantic version tag for future releases. Upgrades then require only a backup followed by `docker compose pull` and `docker compose up -d`. To build the current checkout instead, combine either base file with the source-build override:
 
 ```sh
 docker compose -f deploy/compose.local.yaml -f deploy/compose.build.yaml up --build

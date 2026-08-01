@@ -71,7 +71,7 @@ docker compose --env-file .env -f compose.yaml up -d
 docker compose --env-file .env -f compose.yaml logs -f clipmesh
 ```
 
-No registry login is required. Set `CLIPMESH_IMAGE=ghcr.io/yiprograms/clipmesh:0.3.0` in `.env` to pin a release instead of tracking `latest`. See the [deployment guide](docs/DEPLOYMENT.md) for source builds, backups, upgrades, quotas, and using an existing reverse proxy.
+No registry login is required. For a reproducible deployment, set `CLIPMESH_IMAGE=ghcr.io/yiprograms/clipmesh:sha-07d4883` in `.env` instead of tracking `latest`. Future tagged releases will also publish version tags. See the [deployment guide](docs/DEPLOYMENT.md) for source builds, backups, upgrades, quotas, and using an existing reverse proxy.
 
 ## Native client
 
