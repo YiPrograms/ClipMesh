@@ -2,9 +2,7 @@ name: clipmesh-local
 
 services:
   clipmesh:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile
+    image: ${CLIPMESH_IMAGE:-ghcr.io/yiprograms/clipmesh:latest}
     restart: unless-stopped
     environment:
       CLIPMESH_PUBLIC_URL: http://127.0.0.1:8787

@@ -1,0 +1,6 @@
+services:
+  clipmesh:
+    image: clipmesh:local
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile

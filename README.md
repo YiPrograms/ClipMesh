@@ -30,10 +30,21 @@ Tagged GitHub releases also contain `clipmesh-extension-vVERSION.zip` and `SHA25
 
 ## Docker Compose
 
-Run a loopback-only server for local evaluation:
+The public image supports Linux x86-64 and ARM64. Run a loopback-only server without cloning this repository:
 
 ```sh
-docker compose -f deploy/compose.local.yaml up --build
+docker run -d --name clipmesh --restart unless-stopped \
+  -p 127.0.0.1:8787:8787 \
+  -e CLIPMESH_PUBLIC_URL=http://127.0.0.1:8787 \
+  -v clipmesh-data:/var/lib/clipmesh \
+  ghcr.io/yiprograms/clipmesh:latest
+```
+
+Alternatively, download the local Compose file and start it:
+
+```sh
+curl -fsSLO https://raw.githubusercontent.com/YiPrograms/ClipMesh/main/deploy/compose.local.yaml
+docker compose -f compose.local.yaml up -d
 ```
 
 Open <http://127.0.0.1:8787>, or check it from another terminal:
@@ -42,22 +53,25 @@ Open <http://127.0.0.1:8787>, or check it from another terminal:
 curl --fail http://127.0.0.1:8787/api/v1/health
 ```
 
-State is retained in the `clipmesh-data` volume. Stop the containers with `Ctrl+C`; remove them without deleting data with:
+State is retained in the `clipmesh-data` volume. Stop and remove the container without deleting that data with the matching command:
 
 ```sh
-docker compose -f deploy/compose.local.yaml down
+docker rm -f clipmesh
+# Or, if you used Compose:
+docker compose -f compose.local.yaml down
 ```
 
-For an HTTPS deployment with automatic certificates, copy and edit the environment example before starting the included Caddy stack:
+For an HTTPS deployment with automatic certificates, download and edit the environment example before starting the included Caddy stack:
 
 ```sh
-cp deploy/clipmesh.env.example .env
+curl -fsSLO https://raw.githubusercontent.com/YiPrograms/ClipMesh/main/deploy/compose.yaml
+curl -fsSL https://raw.githubusercontent.com/YiPrograms/ClipMesh/main/deploy/clipmesh.env.example -o .env
 # Set the domain, public URL, and at least one extension distribution URL.
-docker compose --env-file .env -f deploy/compose.yaml up -d --build
-docker compose --env-file .env -f deploy/compose.yaml logs -f clipmesh
+docker compose --env-file .env -f compose.yaml up -d
+docker compose --env-file .env -f compose.yaml logs -f clipmesh
 ```
 
-The `.env` file is ignored by Git. See the [deployment guide](docs/DEPLOYMENT.md) for backups, upgrades, quotas, and using an existing reverse proxy.
+No registry login is required. Set `CLIPMESH_IMAGE=ghcr.io/yiprograms/clipmesh:0.3.0` in `.env` to pin a release instead of tracking `latest`. See the [deployment guide](docs/DEPLOYMENT.md) for source builds, backups, upgrades, quotas, and using an existing reverse proxy.
 
 ## Native client
 

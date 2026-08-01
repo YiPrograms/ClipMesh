@@ -2,9 +2,7 @@ name: clipmesh
 
 services:
   clipmesh:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile
+    image: ${CLIPMESH_IMAGE:-ghcr.io/yiprograms/clipmesh:latest}
     restart: unless-stopped
     environment:
       CLIPMESH_PUBLIC_URL: ${CLIPMESH_PUBLIC_URL:?set the public HTTPS URL}

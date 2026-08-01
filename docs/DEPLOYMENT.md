@@ -4,36 +4,46 @@ ClipMesh must be exposed over HTTPS/WSS except during loopback development. The 
 
 ## Container deployment
 
-For a local loopback-only evaluation, run the minimal server Compose example from the repository root:
+ClipMesh publishes a public multi-platform server image for Linux x86-64 and ARM64 at `ghcr.io/yiprograms/clipmesh`. No registry login is required. `latest` follows the latest successful build from `main`; release deployments should pin a version tag such as `0.3.0`.
+
+For a local loopback-only evaluation without cloning the repository, download the minimal server Compose example:
 
 ```sh
-docker compose -f deploy/compose.local.yaml up --build
+curl -fsSLO https://raw.githubusercontent.com/YiPrograms/ClipMesh/main/deploy/compose.local.yaml
+docker compose -f compose.local.yaml up -d
 curl --fail http://127.0.0.1:8787/api/v1/health
 ```
 
-The server is then available at <http://127.0.0.1:8787>. Its SQLite database and encrypted file blobs persist in the `clipmesh-data` volume. Stop it with `Ctrl+C`, then remove the container while retaining that volume with:
+The server is then available at <http://127.0.0.1:8787>. Its SQLite database and encrypted file blobs persist in the `clipmesh-data` volume. Stop and remove the container while retaining that volume with:
 
 ```sh
-docker compose -f deploy/compose.local.yaml down
+docker compose -f compose.local.yaml down
 ```
 
 Do not expose the local example on a non-loopback interface; browser and native clients require HTTPS outside loopback development.
 
-For a public deployment, copy `deploy/clipmesh.env.example` to a private environment file and set `CLIPMESH_DOMAIN`, the matching HTTPS `CLIPMESH_PUBLIC_URL`, and at least one browser-extension distribution URL. `CLIPMESH_CHROME_STORE_URL` must be an exact Chrome Web Store listing; `CLIPMESH_EXTENSION_DOWNLOAD_URL` must be a direct HTTPS ZIP URL. Setting both offers both choices:
+For a public deployment, download `deploy/compose.yaml` and `deploy/clipmesh.env.example`, then set `CLIPMESH_DOMAIN`, the matching HTTPS `CLIPMESH_PUBLIC_URL`, and at least one browser-extension distribution URL. `CLIPMESH_CHROME_STORE_URL` must be an exact Chrome Web Store listing; `CLIPMESH_EXTENSION_DOWNLOAD_URL` must be a direct HTTPS ZIP URL. Setting both offers both choices:
 
 ```sh
-cp deploy/clipmesh.env.example .env
+curl -fsSLO https://raw.githubusercontent.com/YiPrograms/ClipMesh/main/deploy/compose.yaml
+curl -fsSL https://raw.githubusercontent.com/YiPrograms/ClipMesh/main/deploy/clipmesh.env.example -o .env
 # Edit .env before continuing.
-docker compose --env-file .env -f deploy/compose.yaml config
-docker compose --env-file .env -f deploy/compose.yaml up -d --build
-docker compose --env-file .env -f deploy/compose.yaml logs -f clipmesh
+docker compose --env-file .env -f compose.yaml config
+docker compose --env-file .env -f compose.yaml up -d
+docker compose --env-file .env -f compose.yaml logs -f clipmesh
 ```
 
 Check the running deployment and stop it without deleting its volumes with:
 
 ```sh
 curl --fail https://clipmesh.example.com/api/v1/health
-docker compose --env-file .env -f deploy/compose.yaml down
+docker compose --env-file .env -f compose.yaml down
+```
+
+Set `CLIPMESH_IMAGE=ghcr.io/yiprograms/clipmesh:VERSION` in `.env` to pin a release. Upgrades then require only a backup followed by `docker compose pull` and `docker compose up -d`. To build the current checkout instead, combine either base file with the source-build override:
+
+```sh
+docker compose -f deploy/compose.local.yaml -f deploy/compose.build.yaml up --build
 ```
 
 The production Compose example includes Caddy for automatic certificates. If Traefik already terminates TLS, run only the ClipMesh service on a private Docker network and preserve the same container environment and `/var/lib/clipmesh` volume. Apply OIDC only to the onboarding and pairing-code creation routes; device registration and the device-token API must remain reachable by native and extension clients.
