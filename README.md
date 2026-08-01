@@ -26,6 +26,8 @@ The development server listens on `127.0.0.1:8787` and stores state under `serve
 
 Open <http://127.0.0.1:8787> for onboarding. To load the extension during development, open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select `extension/dist`. Create a pairing code on the onboarding page, open the extension popup while that tab is active, confirm the origin permission, and pair the device.
 
+Tagged GitHub releases also contain `clipmesh-extension-vVERSION.zip` and `SHA256SUMS`. A server configured with `CLIPMESH_EXTENSION_DOWNLOAD_URL` presents that archive with accurate manual installation and update instructions. Chrome requires users to extract the ZIP and load the folder through Developer mode; a ZIP is not a one-click extension installer.
+
 ## Docker Compose
 
 Run a loopback-only server for local evaluation:
@@ -50,7 +52,7 @@ For an HTTPS deployment with automatic certificates, copy and edit the environme
 
 ```sh
 cp deploy/clipmesh.env.example .env
-# Set CLIPMESH_DOMAIN, CLIPMESH_PUBLIC_URL, and CLIPMESH_CHROME_STORE_URL.
+# Set the domain, public URL, and at least one extension distribution URL.
 docker compose --env-file .env -f deploy/compose.yaml up -d --build
 docker compose --env-file .env -f deploy/compose.yaml logs -f clipmesh
 ```

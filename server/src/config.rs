@@ -10,7 +10,8 @@ pub struct Config {
     pub blob_dir: PathBuf,
     pub public_url: Url,
     pub instance_name: String,
-    pub chrome_store_url: String,
+    pub chrome_store_url: Option<String>,
+    pub extension_download_url: Option<Url>,
     pub native_client: Option<NativeClientRelease>,
     pub max_file_bytes: u64,
     pub file_retention: std::time::Duration,
@@ -38,14 +39,24 @@ impl Config {
         if !public_url_is_secure(&public_url) {
             bail!("CLIPMESH_PUBLIC_URL must use HTTPS outside loopback development");
         }
-        let store_value = env::var("CLIPMESH_CHROME_STORE_URL").ok();
-        if !public_url_is_loopback(&public_url) && store_value.is_none() {
-            bail!("CLIPMESH_CHROME_STORE_URL is required for non-loopback deployments");
-        }
-        let chrome_store_url =
-            store_value.unwrap_or_else(|| "https://chromewebstore.google.com/".into());
-        if !valid_store_url(&chrome_store_url, !public_url_is_loopback(&public_url))? {
+        let loopback = public_url_is_loopback(&public_url);
+        let chrome_store_url = env::var("CLIPMESH_CHROME_STORE_URL")
+            .ok()
+            .filter(|value| !value.trim().is_empty());
+        if let Some(value) = chrome_store_url.as_deref()
+            && !valid_store_url(value, !loopback)?
+        {
             bail!("CLIPMESH_CHROME_STORE_URL must be an HTTPS Chrome Web Store listing URL");
+        }
+        let extension_download_url = env::var("CLIPMESH_EXTENSION_DOWNLOAD_URL")
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+            .map(|value| valid_extension_download_url(&value))
+            .transpose()?;
+        if !loopback && chrome_store_url.is_none() && extension_download_url.is_none() {
+            bail!(
+                "set CLIPMESH_CHROME_STORE_URL or CLIPMESH_EXTENSION_DOWNLOAD_URL for non-loopback deployments"
+            );
         }
         let native_client = native_release(
             env::var("CLIPMESH_CLIENT_RELEASE_BASE_URL")
@@ -66,6 +77,7 @@ impl Config {
             instance_name: env::var("CLIPMESH_INSTANCE_NAME")
                 .unwrap_or_else(|_| "My ClipMesh".into()),
             chrome_store_url,
+            extension_download_url,
             native_client,
             max_file_bytes: env_bytes("CLIPMESH_MAX_FILE_BYTES", 2 * 1024 * 1024 * 1024)?,
             file_retention: env_duration("CLIPMESH_FILE_RETENTION", 7 * 24 * 60 * 60)?,
@@ -86,7 +98,8 @@ impl Config {
             blob_dir,
             public_url: Url::parse("http://127.0.0.1:8787").unwrap(),
             instance_name: "Test ClipMesh".into(),
-            chrome_store_url: "https://example.test/store".into(),
+            chrome_store_url: Some("https://example.test/store".into()),
+            extension_download_url: None,
             native_client: None,
             max_file_bytes: 2 * 1024 * 1024 * 1024,
             file_retention: std::time::Duration::from_secs(7 * 24 * 60 * 60),
@@ -216,6 +229,24 @@ fn valid_store_url(value: &str, require_listing: bool) -> anyhow::Result<bool> {
     Ok(valid_host && (!require_listing || listing))
 }
 
+fn valid_extension_download_url(value: &str) -> anyhow::Result<Url> {
+    let url = Url::parse(value).context("invalid CLIPMESH_EXTENSION_DOWNLOAD_URL")?;
+    if !public_url_is_secure(&url) {
+        bail!("CLIPMESH_EXTENSION_DOWNLOAD_URL must use HTTPS outside loopback development");
+    }
+    if !url.username().is_empty()
+        || url.password().is_some()
+        || url.query().is_some()
+        || url.fragment().is_some()
+    {
+        bail!("CLIPMESH_EXTENSION_DOWNLOAD_URL cannot contain credentials, a query, or a fragment");
+    }
+    if !url.path().to_ascii_lowercase().ends_with(".zip") {
+        bail!("CLIPMESH_EXTENSION_DOWNLOAD_URL must point to a ZIP file");
+    }
+    Ok(url)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -257,6 +288,24 @@ mod tests {
             "http://chromewebstore.google.com/detail/clipmesh/id",
         ] {
             assert!(!valid_store_url(value, true).unwrap(), "{value}");
+        }
+    }
+
+    #[test]
+    fn manual_extension_download_must_be_a_secure_zip() {
+        let value = valid_extension_download_url(
+            "https://github.com/YiPrograms/ClipMesh/releases/download/v0.3.0/clipmesh-extension-v0.3.0.zip",
+        )
+        .unwrap();
+        assert_eq!(value.scheme(), "https");
+        for value in [
+            "http://downloads.example/clipmesh.zip",
+            "https://downloads.example/clipmesh.crx",
+            "https://user:secret@downloads.example/clipmesh.zip",
+            "https://downloads.example/clipmesh.zip?token=secret",
+            "https://downloads.example/clipmesh.zip#fragment",
+        ] {
+            assert!(valid_extension_download_url(value).is_err(), "{value}");
         }
     }
 

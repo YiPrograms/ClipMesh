@@ -1,4 +1,4 @@
-name: Native client release
+name: ClipMesh release
 
 on:
   push:
@@ -60,20 +60,43 @@ jobs:
           name: macos-universal
           path: clipmesh-client-*.tar.gz
 
+  extension:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extension
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - run: node --eval "if ('v' + require('./package.json').version !== process.env.GITHUB_REF_NAME) process.exit(1)"
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
+      - run: cd dist && zip -r "../clipmesh-extension-${GITHUB_REF_NAME}.zip" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chrome-extension
+          path: extension/clipmesh-extension-*.zip
+
   publish:
-    needs: [linux, windows, macos]
+    needs: [linux, windows, macos, extension]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
           pattern: '*'
           merge-multiple: true
-      - run: sha256sum clipmesh-client-* > SHA256SUMS
+      - run: sha256sum clipmesh-* > SHA256SUMS
       - uses: actions/attest-build-provenance@v2
         with:
-          subject-path: 'clipmesh-client-*'
+          subject-path: 'clipmesh-*'
       - env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --generate-notes
-          gh release upload "$GITHUB_REF_NAME" clipmesh-client-* SHA256SUMS --clobber
+          gh release upload "$GITHUB_REF_NAME" clipmesh-* SHA256SUMS --clobber

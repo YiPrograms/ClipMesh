@@ -3,7 +3,7 @@ import { buffer } from '../crypto/encoding';
 
 export interface FileTransferInfo {max_file_bytes:number;chunk_bytes:number;retention_seconds:number}
 export interface FileObject {id:UUID;channel_id:UUID;origin_device_id:UUID;plaintext_size:number;ciphertext_size:number;chunk_size:number;chunk_count:number;next_chunk:number;status:string;expires_at:number;deduplicated:boolean}
-export interface ServerInfo { name:string; server_instance_id:UUID; server_version:string; protocol_version:number; chrome_store_url:string;file_transfer?:FileTransferInfo }
+export interface ServerInfo { name:string; server_instance_id:UUID; server_version:string; protocol_version:number; chrome_store_url:string;extension_download_url?:string;file_transfer?:FileTransferInfo }
 export interface ChannelSummary { id:UUID; name:string; crypto_version:number; member_count:number; joined:boolean; current_sequence:number }
 export interface JoinParameters { channel_id:UUID; crypto_version:number; password_kdf:KdfParameters; wrapped_secret:WrappedSecret; membership_public_key:MembershipPublicKey }
 export interface JoinChallenge { challenge_id:UUID; challenge_random:string; expires_at:number; server_instance_id:UUID; channel_id:UUID; device_id:UUID }
@@ -73,7 +73,7 @@ async function publicJson<T>(serverUrl:string,path:string,init?:RequestInit,vali
 function record(value:unknown):value is Record<string,unknown>{return !!value&&typeof value==='object'&&!Array.isArray(value);}
 function uuid(value:unknown):value is UUID{return typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);}
 function finiteInteger(value:unknown):value is number{return typeof value==='number'&&Number.isSafeInteger(value)&&value>=0;}
-function validServerInfo(value:unknown):value is ServerInfo{return record(value)&&typeof value.name==='string'&&uuid(value.server_instance_id)&&typeof value.server_version==='string'&&value.protocol_version===1&&typeof value.chrome_store_url==='string'&&(value.file_transfer===undefined||validFileTransfer(value.file_transfer));}
+function validServerInfo(value:unknown):value is ServerInfo{return record(value)&&typeof value.name==='string'&&uuid(value.server_instance_id)&&typeof value.server_version==='string'&&value.protocol_version===1&&typeof value.chrome_store_url==='string'&&(value.extension_download_url===undefined||typeof value.extension_download_url==='string')&&(value.file_transfer===undefined||validFileTransfer(value.file_transfer));}
 function validFileTransfer(value:unknown):value is FileTransferInfo{return record(value)&&finiteInteger(value.max_file_bytes)&&value.max_file_bytes>0&&finiteInteger(value.chunk_bytes)&&value.chunk_bytes>0&&finiteInteger(value.retention_seconds)&&value.retention_seconds>0;}
 function validRegistration(value:unknown):value is Registration{return record(value)&&uuid(value.device_id)&&typeof value.device_token==='string'&&value.device_token.length>=40&&uuid(value.server_instance_id)&&value.api_version===1;}
 function validChannelSummary(value:unknown):value is ChannelSummary{return record(value)&&uuid(value.id)&&typeof value.name==='string'&&value.name.length<=320&&value.crypto_version===1&&finiteInteger(value.member_count)&&typeof value.joined==='boolean'&&finiteInteger(value.current_sequence);}

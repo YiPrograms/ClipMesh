@@ -23,6 +23,8 @@ pub struct ServerInfo {
     pub protocol_version: u16,
     pub chrome_store_url: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extension_download_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub native_client: Option<NativeClientInfo>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub file_transfer: Option<FileTransferInfo>,

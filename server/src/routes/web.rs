@@ -13,9 +13,13 @@ pub async fn landing(State(state): State<Arc<AppState>>) -> Html<String> {
     Html(format!(
         r#"<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ClipMesh</title><link rel="stylesheet" href="/assets/app.css"></head>
-<body><main><div class="brand">ClipMesh</div><h1>Encrypted clipboard sync<br>and file transfer.</h1><p class="lede">Pair browsers and native desktops with <strong>{}</strong>. Clipboard text, PNG images, and retained files are end-to-end encrypted; this server never receives channel passwords, clipboard plaintext, or filenames.</p><div class="actions"><a class="primary" href="{}" rel="noreferrer">Install Chrome extension</a><button id="pair">Create pairing code</button><a href="/docs">Documentation</a></div><section id="result" hidden aria-live="polite"></section><section class="native" id="native-downloads"><div class="section-heading"><div><div class="eyebrow">Native client</div><h2>Run ClipMesh in your terminal</h2></div>{}</div><div class="downloads">{}</div><p class="download-note">Portable archives. Running <code>clipmesh</code> opens the foreground TUI; use <code>clipmesh service install</code> for optional background sync. Send a path with <code>clipmesh send-file FILE</code>, or pipe content with <code>--filename</code>. Verify downloads against <a href="{}" rel="noreferrer">SHA256SUMS</a>.</p></section><ol><li>Install the Chrome extension or download the native client for this computer.</li><li>Return here and create a five-minute pairing code.</li><li>Run <code>clipmesh pair --server {} --name &quot;My computer&quot;</code>, or open ClipMesh in Chrome, and enter the code.</li></ol><aside><strong>Clipboard access is sensitive.</strong> ClipMesh can read supported clipboard content while its browser, TUI, or service is running. File content is uploaded only when you choose a file. Pause synchronization before copying secrets.</aside><p class="health"><span></span> Server online · Protocol v1</p></main><script src="/assets/app.js"></script></body></html>"#,
+<body><main><div class="brand">ClipMesh</div><h1>Encrypted clipboard sync<br>and file transfer.</h1><p class="lede">Pair browsers and native desktops with <strong>{}</strong>. Clipboard text, PNG images, and retained files are end-to-end encrypted; this server never receives channel passwords, clipboard plaintext, or filenames.</p><div class="actions">{}<button id="pair">Create pairing code</button><a href="/docs">Documentation</a></div><section id="result" hidden aria-live="polite"></section>{}<section class="native" id="native-downloads"><div class="section-heading"><div><div class="eyebrow">Native client</div><h2>Run ClipMesh in your terminal</h2></div>{}</div><div class="downloads">{}</div><p class="download-note">Portable archives. Running <code>clipmesh</code> opens the foreground TUI; use <code>clipmesh service install</code> for optional background sync. Send a path with <code>clipmesh send-file FILE</code>, or pipe content with <code>--filename</code>. Verify downloads against <a href="{}" rel="noreferrer">SHA256SUMS</a>.</p></section><ol><li>Install the Chrome extension from the Web Store or follow the manual ZIP instructions above. Native clients can use the downloads for this computer.</li><li>Return here and create a five-minute pairing code.</li><li>Run <code>clipmesh pair --server {} --name &quot;My computer&quot;</code>, or open ClipMesh in Chrome, and enter the code.</li></ol><aside><strong>Clipboard access is sensitive.</strong> ClipMesh can read supported clipboard content while its browser, TUI, or service is running. File content is uploaded only when you choose a file. Pause synchronization before copying secrets.</aside><p class="health"><span></span> Server online · Protocol v1</p></main><script src="/assets/app.js"></script></body></html>"#,
         escape_html(&state.config.instance_name),
-        escape_attr(&state.config.chrome_store_url),
+        extension_actions(
+            state.config.chrome_store_url.as_deref(),
+            state.config.extension_download_url.as_ref(),
+        ),
+        manual_extension_install(state.config.extension_download_url.as_ref()),
         release_badge(state.config.native_client.as_ref()),
         download_cards(state.config.native_client.as_ref()),
         checksum_url(state.config.native_client.as_ref()),
@@ -25,7 +29,42 @@ pub async fn landing(State(state): State<Arc<AppState>>) -> Html<String> {
 
 pub async fn documentation() -> Html<&'static str> {
     Html(
-        r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ClipMesh documentation</title><link rel="stylesheet" href="/assets/app.css"></head><body><main><div class="brand">ClipMesh documentation</div><h1>Pair. Join. Route.</h1><h2>Pair a device</h2><p class="lede">Install the unlisted Chrome extension, create a five-minute code on the onboarding page, then open the extension while that server tab is active. Confirm the exact HTTPS origin and enter the code. Pairing does not grant access to any channel.</p><h2>Use channels</h2><p>Create a channel with a unique passphrase of at least twelve characters, preferably the built-in generated value. Share the password out of band. Other paired devices select the channel and enter the same password; the password is checked locally before the server receives a proof.</p><h2>Choose one routing mode</h2><ol><li><strong>Sync:</strong> one channel has Send and Receive.</li><li><strong>Send only:</strong> one or more channels have Send.</li><li><strong>Receive only:</strong> one or more channels have Receive.</li></ol><p>Disabled checkboxes prevent cross-channel loops. Pause controls leave these selections intact.</p><h2>Transfer files</h2><p>Choose a file in the extension or run <code>clipmesh send-file FILE</code>. ClipMesh uploads encrypted chunks before publishing a small encrypted manifest. Receiving devices download and decrypt chunks only after you select Download. The server controls size, retention, and storage quotas.</p><aside><strong>Security:</strong> the server stores ciphertext and visible routing metadata. Endpoint compromise, weak passwords, and people who retain a shared channel password remain outside end-to-end encryption's protection. Channel passwords cannot be recovered.</aside><p><a href="/">Return to onboarding</a></p></main></body></html>"#,
+        r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ClipMesh documentation</title><link rel="stylesheet" href="/assets/app.css"></head><body><main><div class="brand">ClipMesh documentation</div><h1>Pair. Join. Route.</h1><h2>Install the browser extension</h2><p class="lede">Use the Chrome Web Store button when available. For a manual ZIP release, download and extract it to a permanent folder, open <code>chrome://extensions</code>, enable Developer mode, choose Load unpacked, and select the extracted folder. Update manual installations in place and click Reload so the extension keeps the same local identity and pairing state.</p><h2>Pair a device</h2><p>Create a five-minute code on the onboarding page, then open the extension while that server tab is active. Confirm the exact HTTPS origin and enter the code. Pairing does not grant access to any channel.</p><h2>Use channels</h2><p>Create a channel with a unique passphrase of at least twelve characters, preferably the built-in generated value. Share the password out of band. Other paired devices select the channel and enter the same password; the password is checked locally before the server receives a proof.</p><h2>Choose one routing mode</h2><ol><li><strong>Sync:</strong> one channel has Send and Receive.</li><li><strong>Send only:</strong> one or more channels have Send.</li><li><strong>Receive only:</strong> one or more channels have Receive.</li></ol><p>Disabled checkboxes prevent cross-channel loops. Pause controls leave these selections intact.</p><h2>Transfer files</h2><p>Choose a file in the extension or run <code>clipmesh send-file FILE</code>. ClipMesh uploads encrypted chunks before publishing a small encrypted manifest. Receiving devices download and decrypt chunks only after you select Download. The server controls size, retention, and storage quotas.</p><aside><strong>Security:</strong> the server stores ciphertext and visible routing metadata. Endpoint compromise, weak passwords, and people who retain a shared channel password remain outside end-to-end encryption's protection. Channel passwords cannot be recovered.</aside><p><a href="/">Return to onboarding</a></p></main></body></html>"#,
+    )
+}
+
+fn extension_actions(store_url: Option<&str>, download_url: Option<&url::Url>) -> String {
+    let mut actions = String::new();
+    if let Some(value) = store_url {
+        actions.push_str(&format!(
+            r#"<a class="primary" href="{}" rel="noreferrer">Install Chrome extension</a>"#,
+            escape_attr(value)
+        ));
+    }
+    if let Some(value) = download_url {
+        actions.push_str(&format!(
+            r#"<a class="{}" href="{}" rel="noreferrer">Download extension ZIP</a>"#,
+            if store_url.is_none() { "primary" } else { "" },
+            escape_attr(value.as_str())
+        ));
+    }
+    if actions.is_empty() {
+        actions.push_str(r#"<span class="release">Browser download unavailable</span>"#);
+    }
+    actions
+}
+
+fn manual_extension_install(download_url: Option<&url::Url>) -> String {
+    let Some(download_url) = download_url else {
+        return String::new();
+    };
+    let checksums_url = download_url
+        .join("SHA256SUMS")
+        .expect("validated extension release URL");
+    format!(
+        r#"<section class="manual-install" id="manual-extension"><div class="eyebrow">Browser extension</div><h2>Manual Chrome installation</h2><p class="download-note">Chrome cannot install a downloaded ZIP directly. This option is intended for trusted self-hosted deployments and requires Developer mode.</p><div class="actions"><a class="primary" href="{}" rel="noreferrer">Download extension ZIP</a><a href="{}" rel="noreferrer">SHA256SUMS</a></div><ol><li>Extract the ZIP into a permanent folder.</li><li>Open <code>chrome://extensions</code>.</li><li>Enable <strong>Developer mode</strong>.</li><li>Select <strong>Load unpacked</strong> and choose the extracted folder.</li><li>For an update, replace the files in that same folder and select <strong>Reload</strong>.</li></ol><p class="download-note"><strong>Keep the folder in place.</strong> Loading a different folder can create a different extension identity and leave the previous installation's local pairing data behind.</p></section>"#,
+        escape_attr(download_url.as_str()),
+        escape_attr(checksums_url.as_str()),
     )
 }
 
@@ -60,6 +99,8 @@ pub struct InfoResponse {
     protocol_version: u16,
     chrome_store_url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    extension_download_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     native_client: Option<NativeClientInfo>,
     file_transfer: FileTransferInfo,
 }
@@ -91,7 +132,12 @@ pub async fn info(State(state): State<Arc<AppState>>) -> impl IntoResponse {
         server_instance_id: state.instance_id,
         server_version: env!("CARGO_PKG_VERSION"),
         protocol_version: 1,
-        chrome_store_url: state.config.chrome_store_url.clone(),
+        chrome_store_url: state.config.chrome_store_url.clone().unwrap_or_default(),
+        extension_download_url: state
+            .config
+            .extension_download_url
+            .as_ref()
+            .map(ToString::to_string),
         native_client: state.config.native_client.as_ref().map(native_info),
         file_transfer: FileTransferInfo {
             max_file_bytes: state.config.max_file_bytes,

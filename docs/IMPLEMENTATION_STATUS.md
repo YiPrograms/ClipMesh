@@ -2,7 +2,7 @@
 
 The repository includes these source deliverables:
 
-- Rust/Axum server with SQLite WAL metadata, filesystem ciphertext blobs, pairing, opaque device credentials, channel membership proofs, authorization, bounded current/delivery retention, configurable chunked file retention and quotas, WebSocket replay, cleanup, and onboarding.
+- Rust/Axum server with SQLite WAL metadata, filesystem ciphertext blobs, pairing, opaque device credentials, channel membership proofs, authorization, bounded current/delivery retention, configurable chunked file retention and quotas, WebSocket replay, cleanup, and onboarding with Web Store or checksummed manual extension downloads.
 - Chrome Manifest V3 extension with locally bundled Argon2id WebAssembly, versioned AES-GCM envelopes, P-256 membership proofs, exact routing-state enforcement, offscreen clipboard monitoring, text/PNG normalization, on-demand file upload/download, echo suppression, latest-only outbox, and encrypted client-local history.
 - Native Rust client with a foreground-by-default TUI, the same protocol and routing rules, OS credential-store secrets, text/PNG clipboard monitoring, streaming path/stdin file transfer, encrypted SQLite history/outbox, administrative commands, and opt-in user-service management.
 - Frozen cryptographic and WebSocket encodings plus an OpenAPI 3.1 contract and shared Rust/TypeScript vectors.

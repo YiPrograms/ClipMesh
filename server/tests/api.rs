@@ -772,6 +772,48 @@ async fn onboarding_and_api_security_headers_are_present() {
 }
 
 #[tokio::test]
+async fn configured_manual_extension_release_is_advertised_with_installation_steps() {
+    let temp = TempDir::new().unwrap();
+    let database = format!("sqlite://{}", temp.path().join("clipmesh.db").display());
+    let mut config = Config::test(database, temp.path().join("blobs"));
+    config.chrome_store_url = None;
+    config.extension_download_url = Some(
+        url::Url::parse(
+            "https://github.com/YiPrograms/ClipMesh/releases/download/v0.3.0/clipmesh-extension-v0.3.0.zip",
+        )
+        .unwrap(),
+    );
+    let (app, _) = build(config).await.unwrap();
+
+    let response = app
+        .clone()
+        .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let page = String::from_utf8(
+        to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap()
+            .to_vec(),
+    )
+    .unwrap();
+    assert!(page.contains("Download extension ZIP"));
+    assert!(page.contains("chrome://extensions"));
+    assert!(page.contains("Load unpacked"));
+    assert!(page.contains("SHA256SUMS"));
+    assert!(!page.contains("Install Chrome extension"));
+
+    let (status, info) = json_request(&app, "GET", "/api/v1/info", None, json!({})).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(info["chrome_store_url"], "");
+    assert_eq!(
+        info["extension_download_url"],
+        "https://github.com/YiPrograms/ClipMesh/releases/download/v0.3.0/clipmesh-extension-v0.3.0.zip"
+    );
+}
+
+#[tokio::test]
 async fn configured_native_release_is_advertised_with_deterministic_assets() {
     let temp = TempDir::new().unwrap();
     let database = format!("sqlite://{}", temp.path().join("clipmesh.db").display());

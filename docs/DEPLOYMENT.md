@@ -19,7 +19,7 @@ docker compose -f deploy/compose.local.yaml down
 
 Do not expose the local example on a non-loopback interface; browser and native clients require HTTPS outside loopback development.
 
-For a public deployment, copy `deploy/clipmesh.env.example` to a private environment file and set `CLIPMESH_DOMAIN`, the matching HTTPS `CLIPMESH_PUBLIC_URL`, and the exact unlisted Chrome Web Store URL:
+For a public deployment, copy `deploy/clipmesh.env.example` to a private environment file and set `CLIPMESH_DOMAIN`, the matching HTTPS `CLIPMESH_PUBLIC_URL`, and at least one browser-extension distribution URL. `CLIPMESH_CHROME_STORE_URL` must be an exact Chrome Web Store listing; `CLIPMESH_EXTENSION_DOWNLOAD_URL` must be a direct HTTPS ZIP URL. Setting both offers both choices:
 
 ```sh
 cp deploy/clipmesh.env.example .env
@@ -70,6 +70,22 @@ Back up the SQLite database and blob directory as one consistency unit. For SQLi
 6. Keep the prior binary and backup until a paired extension reconnects successfully.
 
 Never enable a TLS-certificate bypass. Apply HSTS at the reverse proxy only after the domain and certificate lifecycle are stable.
+
+## Browser extension downloads
+
+Tagged releases publish `clipmesh-extension-vVERSION.zip` together with the native archives and a shared `SHA256SUMS`. To advertise manual installation on the onboarding page:
+
+```sh
+CLIPMESH_EXTENSION_DOWNLOAD_URL=https://github.com/YiPrograms/ClipMesh/releases/download/v0.3.0/clipmesh-extension-v0.3.0.zip
+```
+
+The server derives the adjacent `SHA256SUMS` link from this URL. The onboarding page explains that users must extract the ZIP into a permanent folder, enable Developer mode at `chrome://extensions`, select **Load unpacked**, and update the same folder in place. This distribution path is manual and does not provide Chrome Web Store signing or automatic updates.
+
+For normal installation and automatic browser updates, additionally configure the approved listing:
+
+```sh
+CLIPMESH_CHROME_STORE_URL=https://chromewebstore.google.com/detail/clipmesh/EXTENSION_ID
+```
 
 ## Native client downloads
 
