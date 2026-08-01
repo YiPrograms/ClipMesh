@@ -61,10 +61,55 @@ docker rm -f clipmesh
 docker compose -f compose.local.yaml down
 ```
 
-For an HTTPS deployment with automatic certificates, download and edit the environment example before starting the included Caddy stack:
+For an HTTPS deployment with automatic certificates, save this as `compose.yaml`:
+
+```yaml
+name: clipmesh
+
+services:
+  clipmesh:
+    image: ${CLIPMESH_IMAGE:-ghcr.io/yiprograms/clipmesh:latest}
+    restart: unless-stopped
+    environment:
+      CLIPMESH_PUBLIC_URL: ${CLIPMESH_PUBLIC_URL:?set the public HTTPS URL}
+      CLIPMESH_INSTANCE_NAME: ${CLIPMESH_INSTANCE_NAME:-My ClipMesh}
+      CLIPMESH_CHROME_STORE_URL: ${CLIPMESH_CHROME_STORE_URL:-}
+      CLIPMESH_EXTENSION_DOWNLOAD_URL: ${CLIPMESH_EXTENSION_DOWNLOAD_URL:-https://github.com/YiPrograms/ClipMesh/releases/download/v0.3.0/clipmesh-extension-v0.3.0.zip}
+      CLIPMESH_CLIENT_RELEASE_BASE_URL: ${CLIPMESH_CLIENT_RELEASE_BASE_URL:-}
+      CLIPMESH_CLIENT_VERSION: ${CLIPMESH_CLIENT_VERSION:-}
+      CLIPMESH_MAX_FILE_BYTES: ${CLIPMESH_MAX_FILE_BYTES:-2GiB}
+      CLIPMESH_FILE_RETENTION: ${CLIPMESH_FILE_RETENTION:-7d}
+      CLIPMESH_FILE_STORAGE_QUOTA: ${CLIPMESH_FILE_STORAGE_QUOTA:-50GiB}
+      CLIPMESH_FILE_CHANNEL_QUOTA: ${CLIPMESH_FILE_CHANNEL_QUOTA:-10GiB}
+      CLIPMESH_INCOMPLETE_UPLOAD_RETENTION: ${CLIPMESH_INCOMPLETE_UPLOAD_RETENTION:-1h}
+      RUST_LOG: ${RUST_LOG:-clipmesh_server=info}
+    volumes:
+      - clipmesh-data:/var/lib/clipmesh
+    networks: [web]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      CLIPMESH_DOMAIN: ${CLIPMESH_DOMAIN:?set the public domain}
+    command: ["caddy", "reverse-proxy", "--from", "${CLIPMESH_DOMAIN}", "--to", "clipmesh:8787"]
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [web]
+
+networks:
+  web:
+volumes:
+  clipmesh-data:
+  caddy-data:
+  caddy-config:
+```
+
+Download and edit the environment example, then start the stack:
 
 ```sh
-curl -fsSLO https://raw.githubusercontent.com/YiPrograms/ClipMesh/main/deploy/compose.yaml
 curl -fsSL https://raw.githubusercontent.com/YiPrograms/ClipMesh/main/deploy/clipmesh.env.example -o .env
 # Set the domain, public URL, and at least one extension distribution URL.
 docker compose --env-file .env -f compose.yaml up -d
