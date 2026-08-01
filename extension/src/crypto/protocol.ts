@@ -25,9 +25,6 @@ export interface ChannelMaterial {
 }
 
 export async function createChannelMaterial(password: string, channelId = crypto.randomUUID()): Promise<ChannelMaterial> {
-  if ([...password].length < 12) throw new Error('Channel password must contain at least 12 characters');
-  const normalized=password.toLocaleLowerCase('en-US').replaceAll(/[^a-z0-9]/g,'');
-  if(['password1234','123456789012','qwertyuiop12','letmeinplease','correcthorsebatterystaple'].includes(normalized)||/^(.)\1{11,}$/.test(password))throw new Error('Choose a less common channel password');
   const salt = randomBytes(16);
   const kdf: KdfParameters = { name:'argon2id', salt:base64(salt), memory_kib:65_536, iterations:3, parallelism:4, output_bytes:32 };
   const rootKey = randomBytes(32);
@@ -110,7 +107,7 @@ export async function contentHash(item:TransferItem):Promise<string>{
   return base64(new Uint8Array(digest));
 }
 
-async function derivePasswordMaster(password:string,kdf:KdfParameters):Promise<Uint8Array>{return argon2id({password:utf8(password),salt:fromBase64(kdf.salt),memorySize:kdf.memory_kib,iterations:kdf.iterations,parallelism:kdf.parallelism,hashLength:kdf.output_bytes,outputType:'binary'});}
+async function derivePasswordMaster(password:string,kdf:KdfParameters):Promise<Uint8Array>{return argon2id({password:password===''?Uint8Array.of(0xff):utf8(password),salt:fromBase64(kdf.salt),memorySize:kdf.memory_kib,iterations:kdf.iterations,parallelism:kdf.parallelism,hashLength:kdf.output_bytes,outputType:'binary'});}
 async function derivePasswordKeys(password:string,kdf:KdfParameters):Promise<{wrapKey:Uint8Array;checkKey:Uint8Array}>{const master=await derivePasswordMaster(password,kdf);const [wrapKey,checkKey]=await Promise.all([hkdf(master,new Uint8Array(),WRAP_INFO),hkdf(master,new Uint8Array(),PASSWORD_CHECK_INFO)]);return{wrapKey,checkKey};}
 async function passwordCheck(key:Uint8Array,channelId:UUID):Promise<Uint8Array>{const hmac=await crypto.subtle.importKey('raw',buffer(key),{name:'HMAC',hash:'SHA-256'},false,['sign']);return new Uint8Array(await crypto.subtle.sign('HMAC',hmac,buffer(concat(PASSWORD_CHECK_LABEL,uuidBytes(channelId)))));}
 async function hkdf(input:Uint8Array,salt:Uint8Array,info:Uint8Array):Promise<Uint8Array>{const key=await crypto.subtle.importKey('raw',buffer(input),'HKDF',false,['deriveBits']);return new Uint8Array(await crypto.subtle.deriveBits({name:'HKDF',hash:'SHA-256',salt:buffer(salt),info:buffer(info)},key,256));}

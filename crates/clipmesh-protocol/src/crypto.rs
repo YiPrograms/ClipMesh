@@ -157,7 +157,6 @@ pub fn content_hash(item: &ClipboardItem) -> String {
 }
 
 pub fn create_channel_material(password: &str, channel_id: Uuid) -> Result<ChannelMaterial> {
-    validate_password(password)?;
     let mut salt = [0_u8; 16];
     rand::rng().fill_bytes(&mut salt);
     let kdf = PasswordKdf {
@@ -618,36 +617,6 @@ pub fn validate_file_manifest(manifest: &FileManifest) -> Result<()> {
     Ok(())
 }
 
-fn validate_password(password: &str) -> Result<()> {
-    if password.chars().count() < 12 {
-        return Err(ProtocolError::Invalid(
-            "channel password must contain at least 12 characters",
-        ));
-    }
-    let normalized: String = password
-        .to_ascii_lowercase()
-        .chars()
-        .filter(|value| value.is_ascii_alphanumeric())
-        .collect();
-    let weak = [
-        "password1234",
-        "123456789012",
-        "qwertyuiop12",
-        "letmeinplease",
-        "correcthorsebatterystaple",
-    ];
-    let repeated = password
-        .chars()
-        .next()
-        .is_some_and(|first| password.chars().all(|value| value == first));
-    if weak.contains(&normalized.as_str()) || repeated {
-        return Err(ProtocolError::Invalid(
-            "choose a less common channel password",
-        ));
-    }
-    Ok(())
-}
-
 fn validate_kdf(kdf: &PasswordKdf) -> Result<()> {
     if kdf.name != "argon2id"
         || !(65_536..=1_048_576).contains(&kdf.memory_kib)
@@ -669,11 +638,16 @@ fn derive_password_keys(password: &str, kdf: &PasswordKdf) -> Result<([u8; 32], 
     let salt = STANDARD
         .decode(&kdf.salt)
         .map_err(|_| ProtocolError::Invalid("invalid KDF salt"))?;
+    let password_bytes: &[u8] = if password.is_empty() {
+        &[0xff]
+    } else {
+        password.as_bytes()
+    };
     let params = Params::new(kdf.memory_kib, kdf.iterations, kdf.parallelism, Some(32))
         .map_err(|_| ProtocolError::Invalid("invalid KDF parameters"))?;
     let mut master = [0_u8; 32];
     Argon2::new(Algorithm::Argon2id, Version::V0x13, params)
-        .hash_password_into(password.as_bytes(), &salt, &mut master)
+        .hash_password_into(password_bytes, &salt, &mut master)
         .map_err(|_| ProtocolError::Crypto)?;
     Ok((
         hkdf(&master, &[], WRAP_INFO),
@@ -1103,6 +1077,22 @@ mod tests {
                 .bytes(),
             b"hello"
         );
+    }
+
+    #[test]
+    fn accepts_arbitrary_channel_passwords() {
+        let channel = Uuid::new_v4();
+        let material = create_channel_material("", channel).unwrap();
+        let secret = unwrap_channel_secret(
+            "",
+            channel,
+            &material.password_kdf,
+            &material.wrapped_secret,
+            &material.membership_public_key.spki,
+        )
+        .unwrap();
+        assert_eq!(secret.root_key, material.secret.root_key);
+        create_channel_material("password1234", Uuid::new_v4()).unwrap();
     }
 
     #[test]

@@ -1,6 +1,6 @@
 # ClipMesh cryptographic envelope v1
 
-All strings are UTF-8. Integers are unsigned big-endian unless stated otherwise. UUIDs are their 16 raw RFC 9562 bytes. Fixed labels include the shown trailing NUL byte. Password bytes are exact UTF-8 with no Unicode normalization.
+All strings are UTF-8. Integers are unsigned big-endian unless stated otherwise. UUIDs are their 16 raw RFC 9562 bytes. Fixed labels include the shown trailing NUL byte. Non-empty password bytes are exact UTF-8 with no Unicode normalization. An empty password is encoded as the single reserved byte `0xff`, which cannot collide with valid UTF-8 password input.
 
 ## Password derivation and secret wrapping
 

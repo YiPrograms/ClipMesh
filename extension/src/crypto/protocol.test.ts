@@ -52,4 +52,10 @@ describe('cryptographic protocol',()=>{
     await expect(unwrapChannelSecret('six unique words make a safer test passphrase',material.channelId,material.passwordKdf,material.wrappedSecret,material.membershipPublicKey.spki)).resolves.toMatchObject({rootKey:material.secret.rootKey,membershipPublicKey:material.secret.membershipPublicKey});
     await expect(unwrapChannelSecret('this is the wrong password',material.channelId,material.passwordKdf,material.wrappedSecret,material.membershipPublicKey.spki)).rejects.toThrow('Incorrect password');
   },30_000);
+
+  it('accepts arbitrary channel passwords',async()=>{
+    const material=await createChannelMaterial('');
+    await expect(unwrapChannelSecret('',material.channelId,material.passwordKdf,material.wrappedSecret,material.membershipPublicKey.spki)).resolves.toMatchObject({rootKey:material.secret.rootKey});
+    await expect(createChannelMaterial('password1234')).resolves.toBeDefined();
+  },30_000);
 });
