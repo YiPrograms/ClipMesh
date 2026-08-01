@@ -3,6 +3,8 @@ use std::{env, net::SocketAddr, path::PathBuf};
 use anyhow::{Context, bail};
 use url::{Host, Url};
 
+const OFFICIAL_RELEASE_ROOT: &str = "https://github.com/YiPrograms/ClipMesh/releases/download";
+
 #[derive(Clone, Debug)]
 pub struct Config {
     pub listen: SocketAddr,
@@ -52,7 +54,8 @@ impl Config {
             .ok()
             .filter(|value| !value.trim().is_empty())
             .map(|value| valid_extension_download_url(&value))
-            .transpose()?;
+            .transpose()?
+            .or(Some(official_extension_download_url()?));
         if !loopback && chrome_store_url.is_none() && extension_download_url.is_none() {
             bail!(
                 "set CLIPMESH_CHROME_STORE_URL or CLIPMESH_EXTENSION_DOWNLOAD_URL for non-loopback deployments"
@@ -65,7 +68,8 @@ impl Config {
             env::var("CLIPMESH_CLIENT_VERSION")
                 .ok()
                 .filter(|value| !value.trim().is_empty()),
-        )?;
+        )?
+        .or(Some(official_native_release()?));
         Ok(Self {
             listen,
             database_url: env::var("CLIPMESH_DATABASE_URL")
@@ -195,6 +199,20 @@ fn native_release(
         base_url.set_path(&format!("{}/", base_url.path()));
     }
     Ok(Some(NativeClientRelease { base_url, version }))
+}
+
+fn official_extension_download_url() -> anyhow::Result<Url> {
+    let version = env!("CARGO_PKG_VERSION");
+    valid_extension_download_url(&format!(
+        "{OFFICIAL_RELEASE_ROOT}/v{version}/clipmesh-extension-v{version}.zip"
+    ))
+}
+
+fn official_native_release() -> anyhow::Result<NativeClientRelease> {
+    let version = env!("CARGO_PKG_VERSION").to_owned();
+    let base_url = Url::parse(&format!("{OFFICIAL_RELEASE_ROOT}/v{version}/"))
+        .context("invalid built-in native release URL")?;
+    Ok(NativeClientRelease { base_url, version })
 }
 
 fn public_url_is_secure(url: &Url) -> bool {
@@ -327,5 +345,22 @@ mod tests {
         .unwrap()
         .unwrap();
         assert_eq!(value.base_url.as_str(), "https://downloads.example/v0.3.0/");
+    }
+
+    #[test]
+    fn official_downloads_follow_the_compiled_version() {
+        let version = env!("CARGO_PKG_VERSION");
+        assert_eq!(
+            official_extension_download_url().unwrap().as_str(),
+            format!(
+                "https://github.com/YiPrograms/ClipMesh/releases/download/v{version}/clipmesh-extension-v{version}.zip"
+            )
+        );
+        let native = official_native_release().unwrap();
+        assert_eq!(native.version, version);
+        assert_eq!(
+            native.base_url.as_str(),
+            format!("https://github.com/YiPrograms/ClipMesh/releases/download/v{version}/")
+        );
     }
 }

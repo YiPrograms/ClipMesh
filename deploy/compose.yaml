@@ -2,15 +2,12 @@ name: clipmesh
 
 services:
   clipmesh:
-    image: ${CLIPMESH_IMAGE:-ghcr.io/yiprograms/clipmesh:latest}
+    image: ghcr.io/yiprograms/clipmesh:latest
     restart: unless-stopped
     environment:
       CLIPMESH_PUBLIC_URL: ${CLIPMESH_PUBLIC_URL:?set the public HTTPS URL}
       CLIPMESH_INSTANCE_NAME: ${CLIPMESH_INSTANCE_NAME:-My ClipMesh}
       CLIPMESH_CHROME_STORE_URL: ${CLIPMESH_CHROME_STORE_URL:-}
-      CLIPMESH_EXTENSION_DOWNLOAD_URL: ${CLIPMESH_EXTENSION_DOWNLOAD_URL:-https://github.com/YiPrograms/ClipMesh/releases/download/v0.3.2/clipmesh-extension-v0.3.2.zip}
-      CLIPMESH_CLIENT_RELEASE_BASE_URL: ${CLIPMESH_CLIENT_RELEASE_BASE_URL:-}
-      CLIPMESH_CLIENT_VERSION: ${CLIPMESH_CLIENT_VERSION:-}
       CLIPMESH_MAX_FILE_BYTES: ${CLIPMESH_MAX_FILE_BYTES:-2GiB}
       CLIPMESH_FILE_RETENTION: ${CLIPMESH_FILE_RETENTION:-7d}
       CLIPMESH_FILE_STORAGE_QUOTA: ${CLIPMESH_FILE_STORAGE_QUOTA:-50GiB}

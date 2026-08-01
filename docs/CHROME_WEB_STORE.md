@@ -18,6 +18,6 @@ The extension bundles all executable JavaScript and its Argon2id WebAssembly mod
 
 ## Manual ZIP releases
 
-The tag-triggered GitHub workflow builds the same `extension/dist` content and publishes it as `clipmesh-extension-vVERSION.zip` with `SHA256SUMS` and a GitHub artifact attestation. Configure its direct URL as `CLIPMESH_EXTENSION_DOWNLOAD_URL` to show a manual download on the server homepage.
+The tag-triggered GitHub workflow builds the same `extension/dist` content and publishes it as `clipmesh-extension-vVERSION.zip` with `SHA256SUMS` and a GitHub artifact attestation. The server automatically links to the official release matching its compiled version on the homepage.
 
 Chrome does not install the ZIP directly. Users must extract it to a permanent folder, enable Developer mode at `chrome://extensions`, and use **Load unpacked**. Updates must replace the contents of that same folder before selecting **Reload**. Treat this as a technical/self-hosting distribution option; the Chrome Web Store remains the supported path for one-click installation and automatic updates.

@@ -26,97 +26,53 @@ The development server listens on `127.0.0.1:8787` and stores state under `serve
 
 Open <http://127.0.0.1:8787> for onboarding. To load the extension during development, open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select `extension/dist`. Create a pairing code on the onboarding page, open the extension popup while that tab is active, confirm the origin permission, and pair the device.
 
-Tagged GitHub releases also contain `clipmesh-extension-vVERSION.zip` and `SHA256SUMS`. A server configured with `CLIPMESH_EXTENSION_DOWNLOAD_URL` presents that archive with accurate manual installation and update instructions. Chrome requires users to extract the ZIP and load the folder through Developer mode; a ZIP is not a one-click extension installer.
+Tagged GitHub releases also contain `clipmesh-extension-vVERSION.zip` and `SHA256SUMS`. The server automatically presents the release matching its compiled version with accurate manual installation and update instructions. Chrome requires users to extract the ZIP and load the folder through Developer mode; a ZIP is not a one-click extension installer.
 
 ## Docker Compose
 
-The public image supports Linux x86-64 and ARM64. Run a loopback-only server without cloning this repository:
-
-```sh
-docker run -d --name clipmesh --restart unless-stopped \
-  -p 127.0.0.1:8787:8787 \
-  -e CLIPMESH_PUBLIC_URL=http://127.0.0.1:8787 \
-  -v clipmesh-data:/var/lib/clipmesh \
-  ghcr.io/yiprograms/clipmesh:latest
-```
-
-Alternatively, download the local Compose file and start it:
-
-```sh
-curl -fsSLO https://raw.githubusercontent.com/YiPrograms/ClipMesh/main/deploy/compose.local.yaml
-docker compose -f compose.local.yaml up -d
-```
-
-Open <http://127.0.0.1:8787>, or check it from another terminal:
-
-```sh
-curl --fail http://127.0.0.1:8787/api/v1/health
-```
-
-State is retained in the `clipmesh-data` volume. Stop and remove the container without deleting that data with the matching command:
-
-```sh
-docker rm -f clipmesh
-# Or, if you used Compose:
-docker compose -f compose.local.yaml down
-```
-
-For an HTTPS deployment with automatic certificates, save this as `compose.yaml`:
+The public image supports Linux x86-64 and ARM64. Save this as `compose.yaml`:
 
 ```yaml
-name: clipmesh
-
 services:
   clipmesh:
-    image: ${CLIPMESH_IMAGE:-ghcr.io/yiprograms/clipmesh:latest}
+    image: ghcr.io/yiprograms/clipmesh:latest
+    container_name: clipmesh
     restart: unless-stopped
-    environment:
-      CLIPMESH_PUBLIC_URL: ${CLIPMESH_PUBLIC_URL:?set the public HTTPS URL}
-      CLIPMESH_INSTANCE_NAME: ${CLIPMESH_INSTANCE_NAME:-My ClipMesh}
-      CLIPMESH_CHROME_STORE_URL: ${CLIPMESH_CHROME_STORE_URL:-}
-      CLIPMESH_EXTENSION_DOWNLOAD_URL: ${CLIPMESH_EXTENSION_DOWNLOAD_URL:-https://github.com/YiPrograms/ClipMesh/releases/download/v0.3.2/clipmesh-extension-v0.3.2.zip}
-      CLIPMESH_CLIENT_RELEASE_BASE_URL: ${CLIPMESH_CLIENT_RELEASE_BASE_URL:-}
-      CLIPMESH_CLIENT_VERSION: ${CLIPMESH_CLIENT_VERSION:-}
-      CLIPMESH_MAX_FILE_BYTES: ${CLIPMESH_MAX_FILE_BYTES:-2GiB}
-      CLIPMESH_FILE_RETENTION: ${CLIPMESH_FILE_RETENTION:-7d}
-      CLIPMESH_FILE_STORAGE_QUOTA: ${CLIPMESH_FILE_STORAGE_QUOTA:-50GiB}
-      CLIPMESH_FILE_CHANNEL_QUOTA: ${CLIPMESH_FILE_CHANNEL_QUOTA:-10GiB}
-      CLIPMESH_INCOMPLETE_UPLOAD_RETENTION: ${CLIPMESH_INCOMPLETE_UPLOAD_RETENTION:-1h}
-      RUST_LOG: ${RUST_LOG:-clipmesh_server=info}
+    ports:
+      - "127.0.0.1:8787:8787"
+    env_file:
+      - .env
     volumes:
-      - clipmesh-data:/var/lib/clipmesh
-    networks: [web]
-
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    environment:
-      CLIPMESH_DOMAIN: ${CLIPMESH_DOMAIN:?set the public domain}
-    command: ["caddy", "reverse-proxy", "--from", "${CLIPMESH_DOMAIN}", "--to", "clipmesh:8787"]
-    ports: ["80:80", "443:443", "443:443/udp"]
-    volumes:
-      - caddy-data:/data
-      - caddy-config:/config
-    networks: [web]
-
-networks:
-  web:
-volumes:
-  clipmesh-data:
-  caddy-data:
-  caddy-config:
+      - ./data:/var/lib/clipmesh
 ```
 
-Download and edit the environment example, then start the stack:
+Put the server options in `.env`:
+
+```dotenv
+CLIPMESH_LISTEN=0.0.0.0:8787
+CLIPMESH_PUBLIC_URL=http://127.0.0.1:8787
+CLIPMESH_INSTANCE_NAME=Home ClipMesh
+# CLIPMESH_CHROME_STORE_URL=https://chromewebstore.google.com/detail/replace-with-unlisted-id
+CLIPMESH_DATABASE_URL=sqlite:///var/lib/clipmesh/clipmesh.db
+CLIPMESH_BLOB_DIR=/var/lib/clipmesh/blobs
+CLIPMESH_MAX_FILE_BYTES=2GiB
+CLIPMESH_FILE_RETENTION=7d
+CLIPMESH_FILE_STORAGE_QUOTA=50GiB
+CLIPMESH_FILE_CHANNEL_QUOTA=10GiB
+CLIPMESH_INCOMPLETE_UPLOAD_RETENTION=1h
+RUST_LOG=clipmesh_server=info
+```
+
+Create the bind-mount directory for the container's UID 10001 and start it:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/YiPrograms/ClipMesh/main/deploy/clipmesh.env.example -o .env
-# Set the domain, public URL, and at least one extension distribution URL.
-docker compose --env-file .env -f compose.yaml up -d
-docker compose --env-file .env -f compose.yaml logs -f clipmesh
+mkdir -p data
+sudo chown 10001 data
+docker compose up -d
+docker compose logs -f clipmesh
 ```
 
-No registry login is required. For a reproducible deployment, set `CLIPMESH_IMAGE=ghcr.io/yiprograms/clipmesh:sha-07d4883` in `.env` instead of tracking `latest`. Future tagged releases will also publish version tags. See the [deployment guide](docs/DEPLOYMENT.md) for source builds, backups, upgrades, quotas, and using an existing reverse proxy.
+For a public deployment, change `CLIPMESH_PUBLIC_URL` to the HTTPS URL served by your reverse proxy. No registry login is required. See the [deployment guide](docs/DEPLOYMENT.md) for backups, upgrades, quotas, and reverse-proxy examples.
 
 ## Native client
 

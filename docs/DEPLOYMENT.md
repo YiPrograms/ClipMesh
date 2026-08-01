@@ -22,7 +22,7 @@ docker compose -f compose.local.yaml down
 
 Do not expose the local example on a non-loopback interface; browser and native clients require HTTPS outside loopback development.
 
-For a public deployment, download `deploy/compose.yaml` and `deploy/clipmesh.env.example`, then set `CLIPMESH_DOMAIN`, the matching HTTPS `CLIPMESH_PUBLIC_URL`, and at least one browser-extension distribution URL. `CLIPMESH_CHROME_STORE_URL` must be an exact Chrome Web Store listing; `CLIPMESH_EXTENSION_DOWNLOAD_URL` must be a direct HTTPS ZIP URL. Setting both offers both choices:
+For a public deployment, download `deploy/compose.yaml` and `deploy/clipmesh.env.example`, then set `CLIPMESH_DOMAIN` and the matching HTTPS `CLIPMESH_PUBLIC_URL`. Official extension and native-client downloads are derived automatically from the server's compiled version. `CLIPMESH_CHROME_STORE_URL` is optional and must be an exact Chrome Web Store listing:
 
 ```sh
 curl -fsSLO https://raw.githubusercontent.com/YiPrograms/ClipMesh/main/deploy/compose.yaml
@@ -40,7 +40,7 @@ curl --fail https://clipmesh.example.com/api/v1/health
 docker compose --env-file .env -f compose.yaml down
 ```
 
-Set `CLIPMESH_IMAGE=ghcr.io/yiprograms/clipmesh:sha-07d4883` in `.env` to pin the currently published image; use a semantic version tag for future releases. Upgrades then require only a backup followed by `docker compose pull` and `docker compose up -d`. To build the current checkout instead, combine either base file with the source-build override:
+The Compose file tracks `latest`; upgrades require only a backup followed by `docker compose pull` and `docker compose up -d`. To pin a deployment, replace the image tag in `compose.yaml` with a semantic version or immutable `sha-SHORT_COMMIT` tag. To build the current checkout instead, combine either base file with the source-build override:
 
 ```sh
 docker compose -f deploy/compose.local.yaml -f deploy/compose.build.yaml up --build
@@ -83,13 +83,7 @@ Never enable a TLS-certificate bypass. Apply HSTS at the reverse proxy only afte
 
 ## Browser extension downloads
 
-Tagged releases publish `clipmesh-extension-vVERSION.zip` together with the native archives and a shared `SHA256SUMS`. To advertise manual installation on the onboarding page:
-
-```sh
-CLIPMESH_EXTENSION_DOWNLOAD_URL=https://github.com/YiPrograms/ClipMesh/releases/download/v0.3.2/clipmesh-extension-v0.3.2.zip
-```
-
-The server derives the adjacent `SHA256SUMS` link from this URL. The onboarding page explains that users must extract the ZIP into a permanent folder, enable Developer mode at `chrome://extensions`, select **Load unpacked**, and update the same folder in place. This distribution path is manual and does not provide Chrome Web Store signing or automatic updates.
+Tagged releases publish `clipmesh-extension-vVERSION.zip` together with the native archives and a shared `SHA256SUMS`. The server uses its compiled package version to advertise the matching official GitHub release automatically, including the adjacent checksum link. The onboarding page explains that users must extract the ZIP into a permanent folder, enable Developer mode at `chrome://extensions`, select **Load unpacked**, and update the same folder in place. This distribution path is manual and does not provide Chrome Web Store signing or automatic updates.
 
 For normal installation and automatic browser updates, additionally configure the approved listing:
 
@@ -99,17 +93,10 @@ CLIPMESH_CHROME_STORE_URL=https://chromewebstore.google.com/detail/clipmesh/EXTE
 
 ## Native client downloads
 
-The onboarding page shows Windows, macOS, and Linux cards. To turn those cards into links, set both variables below; omit both to leave native downloads unavailable without affecting existing deployments:
+The onboarding page automatically shows Windows, macOS, and Linux links for the official release matching the server's compiled version. ClipMesh constructs deterministic asset names:
 
-```sh
-CLIPMESH_CLIENT_RELEASE_BASE_URL=https://github.com/YiPrograms/ClipMesh/releases/download/v0.3.2/
-CLIPMESH_CLIENT_VERSION=0.3.2
-```
-
-The base URL is the directory containing the three portable archives and `SHA256SUMS`. It must use HTTPS outside loopback development. ClipMesh constructs deterministic asset names:
-
-- `clipmesh-client-v0.3.2-windows-x86_64.zip`
-- `clipmesh-client-v0.3.2-linux-x86_64.tar.gz`
-- `clipmesh-client-v0.3.2-macos-universal.tar.gz`
+- `clipmesh-client-vVERSION-windows-x86_64.zip`
+- `clipmesh-client-vVERSION-linux-x86_64.tar.gz`
+- `clipmesh-client-vVERSION-macos-universal.tar.gz`
 
 The tag-triggered release workflow builds these archives, publishes checksums, and records GitHub artifact attestations. The initial native release is unsigned, so the download page directs users to verify `SHA256SUMS`; production distributors may add platform signing without changing filenames.

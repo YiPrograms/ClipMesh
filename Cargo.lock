@@ -672,7 +672,7 @@ dependencies = [
 
 [[package]]
 name = "clipmesh-client"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -706,7 +706,7 @@ dependencies = [
 
 [[package]]
 name = "clipmesh-protocol"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "aes-gcm",
  "argon2",
@@ -726,7 +726,7 @@ dependencies = [
 
 [[package]]
 name = "clipmesh-server"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "anyhow",
  "axum",
