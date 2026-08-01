@@ -1,0 +1,23 @@
+[package]
+name = "clipmesh-protocol"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+aes-gcm = "0.10"
+argon2 = "0.5"
+base64 = "0.22"
+hkdf = "0.12"
+hmac = "0.12"
+p256 = { version = "0.13", features = ["ecdsa", "pkcs8"] }
+rand = "0.9"
+serde = { version = "1", features = ["derive"] }
+sha2 = "0.10"
+subtle = "2"
+thiserror = "2"
+uuid = { version = "1", features = ["v4", "v7", "serde"] }
+
+[dev-dependencies]
+hex = "0.4"
+serde_json = "1"

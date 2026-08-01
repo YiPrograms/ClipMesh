@@ -1,0 +1,165 @@
+openapi: 3.1.0
+info:
+  title: ClipMesh API
+  version: 0.3.0
+  description: Password-opaque routing API for encrypted clipboard envelopes and retained file objects. There is intentionally no history endpoint.
+servers:
+  - url: /api/v1
+security:
+  - bearerToken: []
+paths:
+  /info:
+    get:
+      security: []
+      operationId: serverInfo
+      responses:
+        '200': {description: Server identity and compatibility, content: {application/json: {schema: {$ref: '#/components/schemas/ServerInfo'}}}}
+  /health:
+    get:
+      security: []
+      operationId: health
+      responses:
+        '200': {description: Process, database, and blob health, content: {application/json: {schema: {type: object}}}}
+  /pairing:
+    post:
+      security: []
+      operationId: createPairingCode
+      responses:
+        '201': {description: Five-minute single-use code, content: {application/json: {schema: {$ref: '#/components/schemas/PairingCode'}}}}
+  /devices/register:
+    post:
+      security: []
+      operationId: registerDevice
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RegisterDevice'}}}}
+      responses:
+        '201': {description: Device credential issued, content: {application/json: {schema: {$ref: '#/components/schemas/RegisteredDevice'}}}}
+  /device:
+    get: {operationId: getDevice, responses: {'200': {description: Current device, content: {application/json: {schema: {type: object}}}}, '401': {$ref: '#/components/responses/Unauthorized'}}}
+    patch:
+      operationId: renameDevice
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [name], properties: {name: {type: string, maxLength: 80}}}}}}
+      responses: {'200': {description: Renamed device}, '401': {$ref: '#/components/responses/Unauthorized'}}
+    delete: {operationId: revokeDevice, responses: {'204': {description: Device revoked and memberships removed}, '401': {$ref: '#/components/responses/Unauthorized'}}}
+  /device/token/rotate:
+    post: {operationId: rotateDeviceToken, responses: {'200': {description: Replacement token, content: {application/json: {schema: {type: object, properties: {device_token: {type: string}}}}}}}}
+  /channels:
+    get:
+      operationId: listChannels
+      responses: {'200': {description: Paired-device channel directory, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/ChannelSummary'}}}}}}
+    post:
+      operationId: createChannel
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CreateChannel'}}}}
+      responses: {'201': {description: Password-wrapped channel created}, '409': {description: Name or ID conflict}}
+  /channels/{channel_id}/join-parameters:
+    get:
+      operationId: getJoinParameters
+      parameters: [{$ref: '#/components/parameters/ChannelId'}]
+      responses: {'200': {description: Public KDF and wrapped-secret fields, content: {application/json: {schema: {$ref: '#/components/schemas/JoinParameters'}}}}}
+  /channels/{channel_id}/join-challenge:
+    post:
+      operationId: createJoinChallenge
+      parameters: [{$ref: '#/components/parameters/ChannelId'}]
+      responses: {'201': {description: Sixty-second single-use challenge, content: {application/json: {schema: {$ref: '#/components/schemas/JoinChallenge'}}}}, '429': {description: Join attempt limit reached}}
+  /channels/{channel_id}/join:
+    post:
+      operationId: joinChannel
+      parameters: [{$ref: '#/components/parameters/ChannelId'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/JoinProof'}}}}
+      responses: {'204': {description: Membership granted}, '403': {description: Invalid proof}}
+  /channels/{channel_id}/leave:
+    post: {operationId: leaveChannel, parameters: [{$ref: '#/components/parameters/ChannelId'}], responses: {'204': {description: Membership removed; a zero-member channel is deleted}}}
+  /channels/{channel_id}:
+    delete: {operationId: deleteChannel, parameters: [{$ref: '#/components/parameters/ChannelId'}], responses: {'204': {description: Sole-member channel deleted}, '403': {description: Device is not the sole member}}}
+  /channels/{channel_id}/members:
+    get: {operationId: listMembers, parameters: [{$ref: '#/components/parameters/ChannelId'}], responses: {'200': {description: Channel member devices}, '403': {description: Membership required}}}
+  /channels/{channel_id}/items:
+    post:
+      operationId: publishItem
+      parameters:
+        - {$ref: '#/components/parameters/ChannelId'}
+        - {in: header, name: Idempotency-Key, required: true, schema: {type: string, format: uuid}}
+        - {in: header, name: X-Crypto-Version, required: true, schema: {type: integer, const: 1}}
+        - {in: header, name: X-Content-Type, required: true, schema: {type: string, enum: [text/plain, image/png, application/vnd.clipmesh.file]}}
+        - {in: header, name: X-Envelope-Nonce, required: true, schema: {type: string, contentEncoding: base64}}
+      requestBody: {required: true, content: {application/octet-stream: {schema: {type: string, contentEncoding: binary}}}}
+      responses: {'201': {description: Encrypted item accepted, content: {application/json: {schema: {$ref: '#/components/schemas/UploadReceipt'}}}}, '200': {description: Idempotent duplicate}, '413': {description: Envelope too large}}
+  /channels/{channel_id}/current:
+    get: {operationId: currentItem, parameters: [{$ref: '#/components/parameters/ChannelId'}], responses: {'200': {description: Latest encrypted-item metadata, content: {application/json: {schema: {$ref: '#/components/schemas/ItemMetadata'}}}}, '403': {description: Membership required}}}
+  /items/{item_id}/content:
+    get:
+      operationId: itemContent
+      parameters: [{$ref: '#/components/parameters/ItemId'}]
+      responses: {'200': {description: Raw AES-GCM ciphertext, content: {application/octet-stream: {schema: {type: string, contentEncoding: binary}}}}, '403': {description: Membership required}}
+  /items/{item_id}/ack:
+    post:
+      operationId: acknowledgeItem
+      parameters: [{$ref: '#/components/parameters/ItemId'}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [channel_id, sequence], properties: {channel_id: {type: string, format: uuid}, sequence: {type: integer}}}}}}
+      responses: {'204': {description: Delivery sequence recorded}}
+  /channels/{channel_id}/files:
+    post:
+      operationId: createFileUpload
+      parameters: [{$ref: '#/components/parameters/ChannelId'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CreateFile'}}}}
+      responses: {'201': {description: File upload reserved, content: {application/json: {schema: {$ref: '#/components/schemas/FileObject'}}}}, '200': {description: Idempotent reservation}, '413': {description: File exceeds configured maximum}, '507': {description: Instance or channel quota is full}}
+  /files/{file_id}:
+    get:
+      operationId: fileMetadata
+      parameters: [{$ref: '#/components/parameters/FileId'}]
+      responses: {'200': {description: Visible storage metadata, content: {application/json: {schema: {$ref: '#/components/schemas/FileObject'}}}}, '403': {description: Channel membership required}, '410': {description: File expired or was deleted}}
+    delete:
+      operationId: deleteFile
+      parameters: [{$ref: '#/components/parameters/FileId'}]
+      responses: {'204': {description: Sender deleted file ciphertext}, '403': {description: Only the origin device may delete the file}}
+  /files/{file_id}/chunks/{index}:
+    put:
+      operationId: uploadFileChunk
+      parameters: [{$ref: '#/components/parameters/FileId'}, {$ref: '#/components/parameters/ChunkIndex'}]
+      requestBody: {required: true, content: {application/octet-stream: {schema: {type: string, contentEncoding: binary}}}}
+      responses: {'204': {description: Authenticated ciphertext chunk stored}, '409': {description: Chunks must be uploaded sequentially}, '410': {description: Upload expired}}
+    get:
+      operationId: downloadFileChunk
+      parameters: [{$ref: '#/components/parameters/FileId'}, {$ref: '#/components/parameters/ChunkIndex'}]
+      responses: {'200': {description: Authenticated ciphertext chunk, content: {application/octet-stream: {schema: {type: string, contentEncoding: binary}}}}, '403': {description: Channel membership required}, '410': {description: File expired}}
+  /files/{file_id}/complete:
+    post:
+      operationId: completeFileUpload
+      parameters: [{$ref: '#/components/parameters/FileId'}]
+      responses: {'200': {description: Upload atomically finalized and retention started, content: {application/json: {schema: {$ref: '#/components/schemas/FileObject'}}}}, '409': {description: Upload is incomplete}, '410': {description: Upload expired}}
+  /ws-ticket:
+    post: {operationId: createWebSocketTicket, responses: {'200': {description: Thirty-second single-use ticket, content: {application/json: {schema: {type: object, required: [ticket, expires_at], properties: {ticket: {type: string}, expires_at: {type: integer}}}}}}}}
+  /sync:
+    get:
+      security: []
+      operationId: syncWebSocket
+      parameters: [{in: query, name: ticket, required: true, schema: {type: string}}]
+      responses: {'101': {description: WebSocket upgrade}}
+components:
+  securitySchemes:
+    bearerToken: {type: http, scheme: bearer, bearerFormat: opaque-256-bit-token}
+  parameters:
+    ChannelId: {in: path, name: channel_id, required: true, schema: {type: string, format: uuid}}
+    ItemId: {in: path, name: item_id, required: true, schema: {type: string, format: uuid}}
+    FileId: {in: path, name: file_id, required: true, schema: {type: string, format: uuid}}
+    ChunkIndex: {in: path, name: index, required: true, schema: {type: integer, minimum: 0}}
+  responses:
+    Unauthorized: {description: Missing, invalid, or revoked device token}
+  schemas:
+    ServerInfo: {type: object, required: [name, server_instance_id, server_version, protocol_version, chrome_store_url, file_transfer], properties: {name: {type: string}, server_instance_id: {type: string, format: uuid}, server_version: {type: string}, protocol_version: {type: integer}, chrome_store_url: {type: string, format: uri}, native_client: {$ref: '#/components/schemas/NativeClient'}, file_transfer: {$ref: '#/components/schemas/FileTransferInfo'}}}
+    FileTransferInfo: {type: object, required: [max_file_bytes, chunk_bytes, retention_seconds], properties: {max_file_bytes: {type: integer, minimum: 1}, chunk_bytes: {type: integer, const: 4194304}, retention_seconds: {type: integer, minimum: 1}}}
+    NativeClient: {type: object, required: [version, downloads, checksums_url], properties: {version: {type: string}, downloads: {type: array, items: {type: object, required: [os, arch, url], properties: {os: {type: string, enum: [windows, linux, macos]}, arch: {type: string, enum: [x86_64, universal]}, url: {type: string, format: uri}}}}, checksums_url: {type: string, format: uri}}}
+    PairingCode: {type: object, required: [code, expires_at], properties: {code: {type: string, pattern: '^[A-Z2-9]{4}-[A-Z2-9]{4}$'}, expires_at: {type: string, format: date-time}}}
+    RegisterDevice: {type: object, required: [pairing_code, name, signing_public_key, browser_family], properties: {pairing_code: {type: string}, name: {type: string, maxLength: 80}, signing_public_key: {type: string, contentEncoding: base64}, browser_family: {type: string, enum: [chrome, clipmesh-cli]}, browser_version: {type: string}, os_family: {type: string, enum: [windows, linux, macos]}}}
+    RegisteredDevice: {type: object, required: [device_id, device_token, server_instance_id, api_version], properties: {device_id: {type: string, format: uuid}, device_token: {type: string}, server_instance_id: {type: string, format: uuid}, api_version: {type: integer, const: 1}}}
+    PasswordKdf: {type: object, required: [name, salt, memory_kib, iterations, parallelism, output_bytes], properties: {name: {type: string, const: argon2id}, salt: {type: string, contentEncoding: base64}, memory_kib: {type: integer, minimum: 65536}, iterations: {type: integer, minimum: 3}, parallelism: {type: integer, minimum: 1}, output_bytes: {type: integer, const: 32}}}
+    WrappedSecret: {type: object, required: [algorithm, nonce, ciphertext], properties: {algorithm: {type: string, const: aes-256-gcm}, nonce: {type: string, contentEncoding: base64}, ciphertext: {type: string, contentEncoding: base64}}}
+    MembershipKey: {type: object, required: [algorithm, spki], properties: {algorithm: {type: string, const: ecdsa-p256-sha256}, spki: {type: string, contentEncoding: base64}}}
+    CreateChannel: {type: object, required: [channel_id, name, crypto_version, password_kdf, wrapped_secret, membership_public_key], properties: {channel_id: {type: string, format: uuid}, name: {type: string, maxLength: 80}, crypto_version: {type: integer, const: 1}, password_kdf: {$ref: '#/components/schemas/PasswordKdf'}, wrapped_secret: {$ref: '#/components/schemas/WrappedSecret'}, membership_public_key: {$ref: '#/components/schemas/MembershipKey'}}}
+    ChannelSummary: {type: object, required: [id, name, crypto_version, member_count, joined, current_sequence], properties: {id: {type: string, format: uuid}, name: {type: string}, crypto_version: {type: integer}, member_count: {type: integer}, joined: {type: boolean}, current_sequence: {type: integer}}}
+    JoinParameters: {type: object, required: [channel_id, crypto_version, password_kdf, wrapped_secret, membership_public_key], properties: {channel_id: {type: string, format: uuid}, crypto_version: {type: integer, const: 1}, password_kdf: {$ref: '#/components/schemas/PasswordKdf'}, wrapped_secret: {$ref: '#/components/schemas/WrappedSecret'}, membership_public_key: {$ref: '#/components/schemas/MembershipKey'}}}
+    JoinChallenge: {type: object, required: [challenge_id, challenge_random, expires_at, server_instance_id, channel_id, device_id], properties: {challenge_id: {type: string, format: uuid}, challenge_random: {type: string, contentEncoding: base64}, expires_at: {type: integer}, server_instance_id: {type: string, format: uuid}, channel_id: {type: string, format: uuid}, device_id: {type: string, format: uuid}}}
+    JoinProof: {type: object, required: [challenge_id, signature_algorithm, signature], properties: {challenge_id: {type: string, format: uuid}, signature_algorithm: {type: string, const: ecdsa-p256-sha256}, signature: {type: string, contentEncoding: base64}}}
+    ItemMetadata: {type: object, required: [id, channel_id, origin_device_id, channel_sequence, crypto_version, content_type, ciphertext_size, nonce, accepted_at], properties: {id: {type: string, format: uuid}, channel_id: {type: string, format: uuid}, origin_device_id: {type: string, format: uuid}, origin_device_name: {type: string}, channel_sequence: {type: integer}, crypto_version: {type: integer}, content_type: {type: string, enum: [text/plain, image/png, application/vnd.clipmesh.file]}, ciphertext_size: {type: integer}, plaintext_size: {type: integer}, image_width: {type: integer}, image_height: {type: integer}, nonce: {type: string, contentEncoding: base64}, created_at_client: {type: string, format: date-time}, accepted_at: {type: string, format: date-time}}}
+    CreateFile: {type: object, required: [file_id, plaintext_size, chunk_size, chunk_count], properties: {file_id: {type: string, format: uuid}, plaintext_size: {type: integer, minimum: 0}, chunk_size: {type: integer, const: 4194304}, chunk_count: {type: integer, minimum: 1}}}
+    FileObject: {type: object, required: [id, channel_id, origin_device_id, plaintext_size, ciphertext_size, chunk_size, chunk_count, next_chunk, status, expires_at, deduplicated], properties: {id: {type: string, format: uuid}, channel_id: {type: string, format: uuid}, origin_device_id: {type: string, format: uuid}, plaintext_size: {type: integer}, ciphertext_size: {type: integer}, chunk_size: {type: integer}, chunk_count: {type: integer}, next_chunk: {type: integer}, status: {type: string, enum: [uploading, ready, expired, deleted]}, expires_at: {type: integer}, deduplicated: {type: boolean}}}
+    UploadReceipt: {type: object, required: [id, channel_sequence, accepted_at, deduplicated], properties: {id: {type: string, format: uuid}, channel_sequence: {type: integer}, accepted_at: {type: string, format: date-time}, deduplicated: {type: boolean}}}

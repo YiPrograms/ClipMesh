@@ -1,0 +1,79 @@
+name: Native client release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
+      - run: cargo build --locked --release -p clipmesh-client
+      - run: |
+          mkdir -p package
+          cp target/release/clipmesh package/clipmesh
+          tar -C package -czf "clipmesh-client-${GITHUB_REF_NAME}-linux-x86_64.tar.gz" clipmesh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64
+          path: clipmesh-client-*.tar.gz
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --locked --release -p clipmesh-client
+      - shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path package
+          Copy-Item target/release/clipmesh.exe package/clipmesh.exe
+          Compress-Archive -Path package/clipmesh.exe -DestinationPath "clipmesh-client-$env:GITHUB_REF_NAME-windows-x86_64.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64
+          path: clipmesh-client-*.zip
+
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
+      - run: cargo build --locked --release -p clipmesh-client --target x86_64-apple-darwin
+      - run: cargo build --locked --release -p clipmesh-client --target aarch64-apple-darwin
+      - run: |
+          mkdir -p package
+          lipo -create target/x86_64-apple-darwin/release/clipmesh target/aarch64-apple-darwin/release/clipmesh -output package/clipmesh
+          tar -C package -czf "clipmesh-client-${GITHUB_REF_NAME}-macos-universal.tar.gz" clipmesh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-universal
+          path: clipmesh-client-*.tar.gz
+
+  publish:
+    needs: [linux, windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*'
+          merge-multiple: true
+      - run: sha256sum clipmesh-client-* > SHA256SUMS
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: 'clipmesh-client-*'
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --generate-notes
+          gh release upload "$GITHUB_REF_NAME" clipmesh-client-* SHA256SUMS --clobber

@@ -1,0 +1,50 @@
+[package]
+name = "clipmesh-client"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[[bin]]
+name = "clipmesh"
+path = "src/main.rs"
+
+[dependencies]
+aes-gcm = "0.10"
+anyhow = "1"
+arboard = { version = "3.6", features = ["wayland-data-control"] }
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4", features = ["derive"] }
+clipmesh-protocol = { path = "../crates/clipmesh-protocol" }
+crossterm = "0.29"
+directories = "6"
+fs2 = "0.4"
+image = { version = "0.25", default-features = false, features = ["png"] }
+p256 = { version = "0.13", features = ["ecdsa", "pkcs8"] }
+rand = "0.9"
+ratatui = "0.30"
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "http2"] }
+rpassword = "7"
+rusqlite = { version = "0.31", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tempfile = "3"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+url = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3", features = ["sync-secret-service", "crypto-rust"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "3", features = ["windows-native"] }
+
+[dev-dependencies]
+tempfile = "3"

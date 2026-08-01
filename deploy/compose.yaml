@@ -1,0 +1,39 @@
+services:
+  clipmesh:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    environment:
+      CLIPMESH_PUBLIC_URL: ${CLIPMESH_PUBLIC_URL:?set the public HTTPS URL}
+      CLIPMESH_INSTANCE_NAME: ${CLIPMESH_INSTANCE_NAME:-My ClipMesh}
+      CLIPMESH_CHROME_STORE_URL: ${CLIPMESH_CHROME_STORE_URL:?set the unlisted Chrome Web Store URL}
+      CLIPMESH_CLIENT_RELEASE_BASE_URL: ${CLIPMESH_CLIENT_RELEASE_BASE_URL:-}
+      CLIPMESH_CLIENT_VERSION: ${CLIPMESH_CLIENT_VERSION:-}
+      CLIPMESH_MAX_FILE_BYTES: ${CLIPMESH_MAX_FILE_BYTES:-2GiB}
+      CLIPMESH_FILE_RETENTION: ${CLIPMESH_FILE_RETENTION:-7d}
+      CLIPMESH_FILE_STORAGE_QUOTA: ${CLIPMESH_FILE_STORAGE_QUOTA:-50GiB}
+      CLIPMESH_FILE_CHANNEL_QUOTA: ${CLIPMESH_FILE_CHANNEL_QUOTA:-10GiB}
+      CLIPMESH_INCOMPLETE_UPLOAD_RETENTION: ${CLIPMESH_INCOMPLETE_UPLOAD_RETENTION:-1h}
+    volumes:
+      - clipmesh-data:/var/lib/clipmesh
+    networks: [web]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      CLIPMESH_DOMAIN: ${CLIPMESH_DOMAIN:?set the public domain}
+    command: ["caddy", "reverse-proxy", "--from", "${CLIPMESH_DOMAIN}", "--to", "clipmesh:8787"]
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [web]
+
+networks:
+  web:
+volumes:
+  clipmesh-data:
+  caddy-data:
+  caddy-config:

@@ -1,0 +1,43 @@
+# Rust build output
+/target/
+
+# Runtime state (may contain device metadata and ciphertext)
+/server/data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.log
+
+# Node and extension build output
+/extension/node_modules/
+/extension/dist/
+
+# Local environment and credentials
+.env
+.env.*
+*.env
+!*.env.example
+.npmrc
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+
+# Local tooling and editor state
+/.agents/
+/.codex/
+/.idea/
+/.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Local release staging
+/artifacts/
+/dist/
