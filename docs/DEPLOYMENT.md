@@ -4,13 +4,41 @@ ClipMesh must be exposed over HTTPS/WSS except during loopback development. The 
 
 ## Container deployment
 
-Copy `deploy/clipmesh.env.example` to a private environment file, set a real HTTPS public URL and the exact unlisted Chrome Web Store URL, then run:
+For a local loopback-only evaluation, run the minimal server Compose example from the repository root:
 
 ```sh
-docker compose --env-file /path/to/clipmesh.env -f deploy/compose.yaml up -d --build
+docker compose -f deploy/compose.local.yaml up --build
+curl --fail http://127.0.0.1:8787/api/v1/health
 ```
 
-The Compose example includes Caddy for automatic certificates. Keep the `clipmesh-data` volume private and backed up. A backup may reveal device names, channel names, memberships, password KDF data, wrapped channel secrets, and ciphertext, but should never contain a channel password or clipboard plaintext.
+The server is then available at <http://127.0.0.1:8787>. Its SQLite database and encrypted file blobs persist in the `clipmesh-data` volume. Stop it with `Ctrl+C`, then remove the container while retaining that volume with:
+
+```sh
+docker compose -f deploy/compose.local.yaml down
+```
+
+Do not expose the local example on a non-loopback interface; browser and native clients require HTTPS outside loopback development.
+
+For a public deployment, copy `deploy/clipmesh.env.example` to a private environment file and set `CLIPMESH_DOMAIN`, the matching HTTPS `CLIPMESH_PUBLIC_URL`, and the exact unlisted Chrome Web Store URL:
+
+```sh
+cp deploy/clipmesh.env.example .env
+# Edit .env before continuing.
+docker compose --env-file .env -f deploy/compose.yaml config
+docker compose --env-file .env -f deploy/compose.yaml up -d --build
+docker compose --env-file .env -f deploy/compose.yaml logs -f clipmesh
+```
+
+Check the running deployment and stop it without deleting its volumes with:
+
+```sh
+curl --fail https://clipmesh.example.com/api/v1/health
+docker compose --env-file .env -f deploy/compose.yaml down
+```
+
+The production Compose example includes Caddy for automatic certificates. If Traefik already terminates TLS, run only the ClipMesh service on a private Docker network and preserve the same container environment and `/var/lib/clipmesh` volume. Apply OIDC only to the onboarding and pairing-code creation routes; device registration and the device-token API must remain reachable by native and extension clients.
+
+Keep the `clipmesh-data` volume private and backed up. A backup may reveal device names, channel names, memberships, password KDF data, wrapped channel secrets, and ciphertext, but should never contain a channel password or clipboard plaintext. Do not run `docker compose down --volumes` unless permanent deletion of the server database and encrypted files is intended.
 
 ## File retention and quotas
 
@@ -48,7 +76,7 @@ Never enable a TLS-certificate bypass. Apply HSTS at the reverse proxy only afte
 The onboarding page shows Windows, macOS, and Linux cards. To turn those cards into links, set both variables below; omit both to leave native downloads unavailable without affecting existing deployments:
 
 ```sh
-CLIPMESH_CLIENT_RELEASE_BASE_URL=https://github.com/owner/repository/releases/download/v0.3.0/
+CLIPMESH_CLIENT_RELEASE_BASE_URL=https://github.com/YiPrograms/ClipMesh/releases/download/v0.3.0/
 CLIPMESH_CLIENT_VERSION=0.3.0
 ```
 

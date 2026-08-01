@@ -3,6 +3,14 @@
   "private": true,
   "version": "0.3.0",
   "type": "module",
+  "homepage": "https://github.com/YiPrograms/ClipMesh",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YiPrograms/ClipMesh.git"
+  },
+  "bugs": {
+    "url": "https://github.com/YiPrograms/ClipMesh/issues"
+  },
   "scripts": {
     "build": "node build.mjs",
     "check": "tsc --noEmit",

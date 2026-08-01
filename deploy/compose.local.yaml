@@ -1,0 +1,25 @@
+name: clipmesh-local
+
+services:
+  clipmesh:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    environment:
+      CLIPMESH_PUBLIC_URL: http://127.0.0.1:8787
+      CLIPMESH_INSTANCE_NAME: Local ClipMesh
+      CLIPMESH_CHROME_STORE_URL: https://chromewebstore.google.com/
+      CLIPMESH_MAX_FILE_BYTES: ${CLIPMESH_MAX_FILE_BYTES:-2GiB}
+      CLIPMESH_FILE_RETENTION: ${CLIPMESH_FILE_RETENTION:-7d}
+      CLIPMESH_FILE_STORAGE_QUOTA: ${CLIPMESH_FILE_STORAGE_QUOTA:-50GiB}
+      CLIPMESH_FILE_CHANNEL_QUOTA: ${CLIPMESH_FILE_CHANNEL_QUOTA:-10GiB}
+      CLIPMESH_INCOMPLETE_UPLOAD_RETENTION: ${CLIPMESH_INCOMPLETE_UPLOAD_RETENTION:-1h}
+      RUST_LOG: ${RUST_LOG:-clipmesh_server=info}
+    ports:
+      - "127.0.0.1:8787:8787"
+    volumes:
+      - clipmesh-data:/var/lib/clipmesh
+
+volumes:
+  clipmesh-data:

@@ -5,3 +5,6 @@ resolver = "2"
 [workspace.package]
 edition = "2024"
 version = "0.3.0"
+license = "MIT"
+repository = "https://github.com/YiPrograms/ClipMesh"
+homepage = "https://github.com/YiPrograms/ClipMesh"

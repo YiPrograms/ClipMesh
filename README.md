@@ -2,6 +2,8 @@
 
 ClipMesh is a self-hosted, end-to-end encrypted clipboard and file-transfer mesh. It pairs a Chrome Manifest V3 extension or native Rust client with a Rust/SQLite server and synchronizes plain text, PNG images, and encrypted files through password-protected channels.
 
+Canonical repository: <https://github.com/YiPrograms/ClipMesh>
+
 ## Development
 
 Requirements: Rust 1.85 or newer, Node.js 20 or newer, and npm.
@@ -23,6 +25,37 @@ CLIPMESH_PUBLIC_URL=http://127.0.0.1:8787 cargo run -p clipmesh-server
 The development server listens on `127.0.0.1:8787` and stores state under `server/data`. TLS is mandatory for non-loopback deployments; terminate TLS at a trusted reverse proxy or configure the server deployment accordingly.
 
 Open <http://127.0.0.1:8787> for onboarding. To load the extension during development, open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select `extension/dist`. Create a pairing code on the onboarding page, open the extension popup while that tab is active, confirm the origin permission, and pair the device.
+
+## Docker Compose
+
+Run a loopback-only server for local evaluation:
+
+```sh
+docker compose -f deploy/compose.local.yaml up --build
+```
+
+Open <http://127.0.0.1:8787>, or check it from another terminal:
+
+```sh
+curl --fail http://127.0.0.1:8787/api/v1/health
+```
+
+State is retained in the `clipmesh-data` volume. Stop the containers with `Ctrl+C`; remove them without deleting data with:
+
+```sh
+docker compose -f deploy/compose.local.yaml down
+```
+
+For an HTTPS deployment with automatic certificates, copy and edit the environment example before starting the included Caddy stack:
+
+```sh
+cp deploy/clipmesh.env.example .env
+# Set CLIPMESH_DOMAIN, CLIPMESH_PUBLIC_URL, and CLIPMESH_CHROME_STORE_URL.
+docker compose --env-file .env -f deploy/compose.yaml up -d --build
+docker compose --env-file .env -f deploy/compose.yaml logs -f clipmesh
+```
+
+The `.env` file is ignored by Git. See the [deployment guide](docs/DEPLOYMENT.md) for backups, upgrades, quotas, and using an existing reverse proxy.
 
 ## Native client
 

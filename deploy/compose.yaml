@@ -1,3 +1,5 @@
+name: clipmesh
+
 services:
   clipmesh:
     build:
@@ -15,6 +17,7 @@ services:
       CLIPMESH_FILE_STORAGE_QUOTA: ${CLIPMESH_FILE_STORAGE_QUOTA:-50GiB}
       CLIPMESH_FILE_CHANNEL_QUOTA: ${CLIPMESH_FILE_CHANNEL_QUOTA:-10GiB}
       CLIPMESH_INCOMPLETE_UPLOAD_RETENTION: ${CLIPMESH_INCOMPLETE_UPLOAD_RETENTION:-1h}
+      RUST_LOG: ${RUST_LOG:-clipmesh_server=info}
     volumes:
       - clipmesh-data:/var/lib/clipmesh
     networks: [web]
